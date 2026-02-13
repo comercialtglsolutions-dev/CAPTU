@@ -1,0 +1,123 @@
+import { Link, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Search,
+  Users,
+  Megaphone,
+  MessageSquare,
+  BarChart3,
+  Settings,
+  Zap,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/search", icon: Search, label: "Buscar Empresas" },
+  { to: "/leads", icon: Users, label: "Leads" },
+  { to: "/campaigns", icon: Megaphone, label: "Campanhas" },
+  { to: "/contacts", icon: MessageSquare, label: "Contatos" },
+  { to: "/metrics", icon: BarChart3, label: "Métricas" },
+  { to: "/automations", icon: Zap, label: "Automações" },
+];
+
+const bottomItems = [
+  { to: "/settings", icon: Settings, label: "Configurações" },
+];
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
+          collapsed ? "w-[68px]" : "w-[240px]"
+        )}
+      >
+        {/* Logo */}
+        <div className="flex h-16 items-center border-b border-sidebar-border px-4 overflow-hidden">
+          <Link to="/" className="flex items-center gap-2 overflow-hidden">
+            <img
+              src={collapsed ? "/captu-collapsed.jpg" : "/captu.png"}
+              alt="CAPTU Logo"
+              className={cn(
+                "h-50 w-auto transition-all duration-300",
+                collapsed ? "min-w-[70px] ml-[-18px]" : "min-w-[120px]"
+              )}
+              style={{ filter: "brightness(1.1)" }}
+            />
+          </Link>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 px-2 py-4">
+          {navItems.map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {!collapsed && <span className="animate-fade-in">{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom */}
+        <div className="space-y-1 border-t border-sidebar-border px-2 py-4">
+          {bottomItems.map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          >
+            {collapsed ? (
+              <ChevronRight className="h-5 w-5 shrink-0" />
+            ) : (
+              <>
+                <ChevronLeft className="h-5 w-5 shrink-0" />
+                <span>Recolher</span>
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 overflow-auto">
+        <div className="p-6 lg:p-8">{children}</div>
+      </main>
+    </div>
+  );
+}
