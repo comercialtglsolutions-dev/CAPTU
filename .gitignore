@@ -12,6 +12,8 @@ dist
 dist-ssr
 .env
 *.local
+Plataforma_Inteligente_Prospecao_B2B_TGL_Solutions.pdf
+
 
 # Editor directories and files
 .vscode/*
