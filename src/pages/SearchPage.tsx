@@ -48,7 +48,7 @@ export default function SearchPage() {
 
   return (
     <>
-      <PageHeader title="Buscar Empresas" description="Encontre empresas por nicho e região usando Google Places" />
+      <PageHeader title="Buscar" description="Encontre empresas por nicho e região usando Google Places" />
 
       <div className="glass-card rounded-xl p-6 mb-8 max-w-2xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">

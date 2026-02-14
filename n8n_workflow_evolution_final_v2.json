@@ -1,0 +1,232 @@
+{
+    "name": "Prospecção Automática - Evolution API (Instância CaptuComercial - Sem Opcionais)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "start-campaign",
+                "options": {}
+            },
+            "id": "8904a9b4-2b54-45a4-8730-3133443082f3",
+            "name": "Webhook Start",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -1184,
+                352
+            ],
+            "webhookId": "start-campaign"
+        },
+        {
+            "parameters": {
+                "url": "=http://host.docker.internal:3000/api/leads/{{$json.body.lead.id}}",
+                "options": {}
+            },
+            "id": "ccbdf9eb-1c63-46e1-aac3-67bfd23fd8d5",
+            "name": "Buscar Lead Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                -960,
+                352
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "number": [
+                        {
+                            "value1": "={{$json.score}}",
+                            "operation": "largerEqual",
+                            "value2": 60
+                        }
+                    ]
+                }
+            },
+            "id": "5ee7c4ca-e6ff-4bf7-a1df-3b50b1b8df2a",
+            "name": "Score >= 60?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                -736,
+                352
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "mensagem",
+                            "value": "=Olá {{$json.name}},\n\nPercebi que sua empresa atua no segmento {{$json.segment}} em {{$json.city}} e possui excelente reputação.\n\nNotei que ainda existe oportunidade de fortalecer sua presença digital.\n\nPosso compartilhar uma análise rápida?\n\nCaso não tenha interesse, basta responder 'remover'."
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "a8539a9b-ee58-48ce-b3f6-ca7a8444ec98",
+            "name": "Gerar Mensagem",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 2,
+            "position": [
+                -512,
+                256
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Delay ajustado para 5-10 segundos para testes rápidos\nconst min = 5000;\nconst max = 10000;\nconst delay = Math.floor(Math.random() * (max - min) + min);\nreturn new Promise(resolve => {\n  setTimeout(() => resolve(items), delay);\n});"
+            },
+            "id": "49643e7a-ee7f-40df-9a06-8a1773ec4764",
+            "name": "Delay Aleatório",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                -288,
+                256
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://host.docker.internal:8080/message/sendText/CaptuComercial",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "54CC09C92EA6-4656-9C16-9E89179B4793"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "=55{{$json.phone.replace(/[^0-9]/g, '')}}"
+                        },
+                        {
+                            "name": "text",
+                            "value": "={{$json.mensagem}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "517b30fc-2ed8-4bd9-8095-33252dc0518a",
+            "name": "Enviar WhatsApp (Evolution)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                -64,
+                256
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=http://host.docker.internal:3000/api/leads/{{$('Buscar Lead Backend').item.json.id}}/history",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "channel",
+                            "value": "whatsapp"
+                        },
+                        {
+                            "name": "message",
+                            "value": "={{$node[\"Gerar Mensagem\"].json[\"mensagem\"]}}"
+                        },
+                        {
+                            "name": "status",
+                            "value": "sent"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "4c0a8bf8-1be7-43ea-bdb0-4e1b2d392d6d",
+            "name": "Registrar Envio Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                160,
+                256
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Start": {
+            "main": [
+                [
+                    {
+                        "node": "Buscar Lead Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Buscar Lead Backend": {
+            "main": [
+                [
+                    {
+                        "node": "Score >= 60?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Score >= 60?": {
+            "main": [
+                [
+                    {
+                        "node": "Gerar Mensagem",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gerar Mensagem": {
+            "main": [
+                [
+                    {
+                        "node": "Delay Aleatório",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Delay Aleatório": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar WhatsApp (Evolution)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar WhatsApp (Evolution)": {
+            "main": [
+                [
+                    {
+                        "node": "Registrar Envio Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "519ffe1f415c2ca54b8345eabc9d994a8beee554c13a13f9c2f163e8efe28d73"
+    }
+}

@@ -29,6 +29,25 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/leads/:id - Busca detalhes de um lead específico
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Lead not found' });
+
+        res.json(data);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/leads/collect - Coleta novos leads via Google Places
 router.post('/collect', async (req, res) => {
     const { query, city } = req.body;
@@ -106,6 +125,36 @@ router.post('/:id/send-to-n8n', async (req, res) => {
 
         res.json({ message: 'Lead sent to n8n successfully', n8n_response: response.data });
 
+    } catch (error: any) {
+        console.error('Error in send-to-n8n:', error.message);
+        if (error.response) {
+            console.error('n8n Response data:', error.response.data);
+            console.error('n8n Response status:', error.response.status);
+        } else if (error.request) {
+            console.error('No response received from n8n (Connection refused? Is n8n running?)');
+        }
+        res.status(500).json({ error: error.message, details: 'Check backend console for more info' });
+    }
+});
+
+// POST /api/leads/:id/history - Registra histórico de contato
+router.post('/:id/history', async (req, res) => {
+    const { id } = req.params;
+    const { channel, message, status } = req.body;
+
+    try {
+        const { error } = await supabase
+            .from('contact_history')
+            .insert({
+                company_id: id,
+                type: channel,
+                message,
+                status,
+                data_envio: new Date().toISOString() // Ajustado para bater com o PDF (data_envio)
+            });
+
+        if (error) throw error;
+        res.json({ message: 'History recorded' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
