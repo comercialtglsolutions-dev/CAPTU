@@ -42,6 +42,7 @@ import { LeadDetailsDialog } from "@/components/LeadDetailsDialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LeadHistory } from "@/components/LeadHistory";
+import { API_URL } from "@/config";
 
 type QualificationFilter = "all" | "qualified" | "unqualified";
 
@@ -105,7 +106,7 @@ export default function LeadsPage() {
 
   const mutation = useMutation({
     mutationFn: async (leadId: string) => {
-      const response = await fetch(`http://localhost:3000/api/leads/${leadId}/send-to-n8n`, {
+      const response = await fetch(`${API_URL}/api/leads/${leadId}/send-to-n8n`, {
         method: "POST",
       });
       if (!response.ok) throw new Error("Falha ao disparar n8n");

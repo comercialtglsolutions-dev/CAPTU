@@ -139,3 +139,103 @@
     background: var(--gradient-sidebar);
   }
 }
+
+/* Custom Google Maps InfoWindow styles - Premium Reset */
+.gm-style-iw {
+  padding: 0 !important;
+  max-width: 320px !important;
+}
+
+.gm-style-iw-c {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.gm-style-iw-d {
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-height: none !important;
+}
+
+/* Position and style the close button */
+.gm-ui-hover-effect {
+  top: 8px !important;
+  right: 8px !important;
+  background: white !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.9 !important;
+  transition: all 0.2s ease !important;
+  z-index: 10 !important;
+}
+
+.gm-ui-hover-effect:hover {
+  opacity: 1 !important;
+  transform: scale(1.1);
+}
+
+.gm-ui-hover-effect span {
+  margin: 0 !important;
+}
+
+/* Remove the default arrow tail shadow if needed or style it */
+.gm-style-iw-tc::after {
+  background: white !important;
+}
+
+/* Phone Input Custom Styles */
+.phone-input-custom {
+  @apply flex h-11 w-full rounded-md border border-gray-300 bg-background px-3 text-base;
+  @apply focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500;
+  @apply transition-colors;
+}
+
+.phone-input-custom .PhoneInputCountry {
+  @apply mr-2 flex items-center gap-2;
+}
+
+.phone-input-custom .PhoneInputCountryIcon {
+  @apply w-6 h-6 border-none shadow-none;
+}
+
+.phone-input-custom .PhoneInputCountryIconImg {
+  @apply border-none shadow-none;
+}
+
+.phone-input-custom .PhoneInputCountrySelect {
+  @apply text-sm text-gray-600 font-medium;
+}
+
+.phone-input-custom .PhoneInputCountrySelectArrow {
+  @apply ml-1 opacity-50;
+}
+
+.phone-input-custom input {
+  @apply text-gray-900 placeholder:text-gray-400;
+}
+
+/* Custom Scrollbar for Kanban */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-300;
+}

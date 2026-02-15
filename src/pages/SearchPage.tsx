@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search, MapPin, Building2, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "@/config";
 
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function SearchPage() {
     setSearching(true);
 
     try {
-      const response = await fetch("http://localhost:3000/api/leads/collect", {
+      const response = await fetch(`${API_URL}/api/leads/collect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: niche, city: city }),

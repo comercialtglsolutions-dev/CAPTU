@@ -7,6 +7,7 @@ import ScoreBadge from "@/components/ScoreBadge";
 import { LeadHistory } from "@/components/LeadHistory";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { API_URL } from "@/config";
 
 interface Lead {
   id: string;
@@ -37,7 +38,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
 
   const mutation = useMutation({
     mutationFn: async (leadId: string) => {
-      const response = await fetch(`http://localhost:3000/api/leads/${leadId}/send-to-n8n`, {
+      const response = await fetch(`${API_URL}/api/leads/${leadId}/send-to-n8n`, {
         method: "POST",
       });
       if (!response.ok) throw new Error("Falha ao disparar n8n");

@@ -83,6 +83,8 @@ export const searchLeads = async (query: string, city: string) => {
                         segment: query
                     };
 
+                    const location = place.geometry?.location;
+
                     return {
                         ...leadInfo,
                         city: cityFromGoogle,
@@ -91,7 +93,9 @@ export const searchLeads = async (query: string, city: string) => {
                         status: 'new',
                         place_id: place.place_id,
                         has_own_website: !!hasOwnWebsite,
-                        origin: 'google_places'
+                        origin: 'google_places',
+                        latitude: location?.lat,
+                        longitude: location?.lng
                     };
                 } catch (err) {
                     console.error(`Error fetching details for ${place.name}:`, err);

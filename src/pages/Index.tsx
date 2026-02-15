@@ -8,6 +8,9 @@ import { Users, Target, MessageSquare, TrendingUp, Handshake, Trophy, Loader2 } 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import LeadMap from "@/components/LeadMap";
+import { LeadDetailsDialog } from "@/components/LeadDetailsDialog";
+import { useState } from "react";
 
 interface Lead {
   id: string;
@@ -18,9 +21,25 @@ interface Lead {
   score: number;
   status: string;
   created_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  phone?: string;
+  email?: string;
+  website?: string;
+  rating?: number;
+  user_ratings_total?: number;
+  address?: string;
+  has_own_website?: boolean;
 }
 
 export default function Dashboard() {
+  const [selectedLeadDetails, setSelectedLeadDetails] = useState<Lead | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  const handleViewDetails = (lead: Lead) => {
+    setSelectedLeadDetails(lead);
+    setIsDetailsOpen(true);
+  };
   // Fetch all leads
   const { data: leads, isLoading: leadsLoading } = useQuery({
     queryKey: ["dashboard-leads"],
@@ -34,6 +53,20 @@ export default function Dashboard() {
       return data as Lead[];
     },
   });
+
+  // Fetch app settings for API key
+  const { data: appSettings } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const mapsApiKey = appSettings?.find(s => s.key_name === "google_places_api_key")?.value || "";
 
   // Fetch contact history
   const { data: contactHistory, isLoading: historyLoading } = useQuery({
@@ -222,6 +255,17 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Map View */}
+      <div className="mb-8">
+        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+          Localização dos Leads Coletados
+          {leads?.filter(l => l.latitude && l.longitude).length === 0 && (
+            <span className="text-[10px] font-normal text-muted-foreground">(Nenhum lead com coordenada exata ainda)</span>
+          )}
+        </h3>
+        <LeadMap leads={leads || []} apiKey={mapsApiKey} onViewDetails={handleViewDetails} />
+      </div>
+
       {/* Recent Leads */}
       <div className="glass-card rounded-xl p-6">
         <h3 className="text-sm font-semibold text-foreground mb-4">Leads Recentes</h3>
@@ -256,6 +300,12 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <LeadDetailsDialog
+        lead={selectedLeadDetails}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </>
   );
 }

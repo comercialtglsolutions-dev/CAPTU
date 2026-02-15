@@ -16,6 +16,12 @@ app.get('/', (req, res) => {
     res.send('CAPTU Backend API is running');
 });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+// Export the Express API
+export default app;
+
+// Start the server only if run directly
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+    });
+}
