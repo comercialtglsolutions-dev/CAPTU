@@ -20,7 +20,8 @@ app.get('/', (req, res) => {
 export default app;
 
 // Start the server only if run directly
-if (require.main === module) {
+// Start the server
+if (!process.env.VERCEL) {
     app.listen(port, () => {
         console.log(`Server is running on port ${port}`);
     });
