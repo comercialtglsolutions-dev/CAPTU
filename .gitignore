@@ -13,6 +13,7 @@ dist-ssr
 .env
 *.local
 Plataforma_Inteligente_Prospecao_B2B_TGL_Solutions.pdf
+n8n_workflow_evolution_final_v2.json
 
 
 # Editor directories and files
