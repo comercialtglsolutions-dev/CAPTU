@@ -5,8 +5,12 @@ import MetricCard from "@/components/MetricCard";
 import { Target, MessageCircle, CalendarCheck, Users, Loader2, PieChart as PieChartIcon, BarChart3, TrendingUp } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { useMemo } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function MetricsPage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   const { data: leads, isLoading: leadsLoading } = useQuery({
     queryKey: ["leads-metrics"],
     queryFn: async () => {
@@ -163,11 +167,13 @@ export default function MetricsPage() {
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
+                  backgroundColor: isDark ? "hsl(var(--card))" : "white",
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                   fontSize: "12px",
+                  color: "hsl(var(--foreground))"
                 }}
+                itemStyle={{ color: "hsl(var(--foreground))" }}
               />
               <Legend />
             </PieChart>
@@ -192,11 +198,13 @@ export default function MetricsPage() {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
+                  backgroundColor: isDark ? "hsl(var(--card))" : "white",
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
-                  fontSize: "12px"
+                  fontSize: "12px",
+                  color: "hsl(var(--foreground))"
                 }}
+                itemStyle={{ color: "hsl(var(--foreground))" }}
               />
               <Legend />
               <Bar dataKey="leads" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} name="Total Leads" />

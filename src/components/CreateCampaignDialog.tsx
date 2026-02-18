@@ -69,14 +69,9 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
         mutationFn: async () => {
             const { error } = await supabase.from("campaigns").insert({
                 name: formData.name,
-                description: formData.description,
-                message_template: formData.message_template,
+                niche: formData.message_template,
                 daily_limit: formData.daily_limit,
-                status: "draft",
-                filters: {
-                    score_min: formData.score_min,
-                    segments: formData.segments,
-                },
+                status: "draft"
             });
 
             if (error) throw error;

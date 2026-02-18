@@ -18,6 +18,12 @@ import {
   MessageSquare,
   TrendingUp,
   Calendar,
+  LayoutGrid,
+  List,
+  Columns2,
+  Clock,
+  ArrowRight,
+  Pencil
 } from "lucide-react";
 import {
   Dialog,
@@ -35,29 +41,35 @@ import {
 import { toast } from "sonner";
 import { CreateCampaignDialog } from "@/components/CreateCampaignDialog";
 import { CampaignDetailsDialog } from "@/components/CampaignDetailsDialog";
+import { EditCampaignDialog } from "@/components/EditCampaignDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 type CampaignStatus = "draft" | "active" | "paused" | "completed";
 type CampaignFilter = "all" | CampaignStatus;
+type ViewMode = "grid" | "list";
 
 interface Campaign {
   id: string;
   name: string;
-  description: string;
   status: CampaignStatus;
-  message_template: string;
+  niche: string;
   daily_limit: number;
   sent_count: number;
   replies_count: number;
   meetings_count: number;
   created_at: string;
   updated_at: string;
-  filters: any;
 }
 
 export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = useState<CampaignFilter>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const queryClient = useQueryClient();
 
   const { data: campaigns, isLoading } = useQuery({
@@ -109,10 +121,9 @@ export default function CampaignsPage() {
     mutationFn: async (campaign: Campaign) => {
       const { error } = await supabase.from("campaigns").insert({
         name: `${campaign.name} (Cópia)`,
-        description: campaign.description,
         status: "draft",
-        message_template: campaign.message_template,
-        daily_limit: campaign.daily_limit,
+        niche: campaign.niche,
+        daily_limit: campaign.daily_limit
       });
       if (error) throw error;
     },
@@ -124,6 +135,53 @@ export default function CampaignsPage() {
       toast.error("Erro ao duplicar campanha");
     },
   });
+
+  const bulkStatusUpdateMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: CampaignStatus }) => {
+      const { error } = await supabase
+        .from("campaigns")
+        .update({ status })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      setSelectedCampaignIds([]);
+      toast.success(`${variables.ids.length} campanhas atualizadas para ${getStatusLabel(variables.status)}`);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar campanhas em massa");
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("campaigns").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      setSelectedCampaignIds([]);
+      toast.success(`${ids.length} campanhas excluídas com sucesso!`);
+    },
+    onError: () => {
+      toast.error("Erro ao excluir campanhas em massa");
+    },
+  });
+
+  const toggleCampaignSelection = (id: string) => {
+    setSelectedCampaignIds(prev =>
+      prev.includes(id) ? prev.filter(cur => cur !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedCampaignIds.length === filteredCampaigns?.length) {
+      setSelectedCampaignIds([]);
+    } else {
+      setSelectedCampaignIds(filteredCampaigns?.map(c => c.id) || []);
+    }
+  };
 
   const filteredCampaigns = campaigns?.filter((c) =>
     statusFilter === "all" ? true : c.status === statusFilter
@@ -198,7 +256,7 @@ export default function CampaignsPage() {
           onClick={() => setStatusFilter("active")}
         >
           Ativas
-          <Badge variant="secondary" className="ml-2 text-xs bg-emerald-500/10 text-emerald-600">
+          <Badge variant="secondary" className="ml-2 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             {stats.active}
           </Badge>
         </Button>
@@ -208,7 +266,7 @@ export default function CampaignsPage() {
           onClick={() => setStatusFilter("paused")}
         >
           Pausadas
-          <Badge variant="secondary" className="ml-2 text-xs bg-amber-500/10 text-amber-600">
+          <Badge variant="secondary" className="ml-2 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400">
             {stats.paused}
           </Badge>
         </Button>
@@ -232,6 +290,27 @@ export default function CampaignsPage() {
             {stats.completed}
           </Badge>
         </Button>
+
+        <div className="ml-auto flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/50">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setViewMode("list")}
+            title="Lista"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setViewMode("grid")}
+            title="Grade"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Campaigns Grid */}
@@ -249,90 +328,75 @@ export default function CampaignsPage() {
             Nova Campanha
           </Button>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCampaigns?.map((campaign) => (
-            <div key={campaign.id} className="glass-card rounded-xl p-5 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground mb-1 truncate">{campaign.name}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                    {campaign.description || "Sem descrição"}
-                  </p>
-                  <Badge className={`text-xs ${getStatusColor(campaign.status)}`}>
-                    {getStatusLabel(campaign.status)}
-                  </Badge>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setSelectedCampaign(campaign)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver Detalhes
-                    </DropdownMenuItem>
-                    {campaign.status === "active" ? (
-                      <DropdownMenuItem
-                        onClick={() => updateStatusMutation.mutate({ id: campaign.id, status: "paused" })}
-                      >
-                        <Pause className="h-4 w-4 mr-2" />
-                        Pausar
-                      </DropdownMenuItem>
-                    ) : campaign.status === "paused" || campaign.status === "draft" ? (
-                      <DropdownMenuItem
-                        onClick={() => updateStatusMutation.mutate({ id: campaign.id, status: "active" })}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Ativar
-                      </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuItem onClick={() => duplicateMutation.mutate(campaign)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Duplicar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => deleteMutation.mutate(campaign.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="text-center p-2 bg-muted/30 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Enviados</p>
-                  <p className="text-lg font-bold text-foreground">{campaign.sent_count}</p>
-                </div>
-                <div className="text-center p-2 bg-muted/30 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Respostas</p>
-                  <p className="text-lg font-bold text-foreground">{campaign.replies_count}</p>
-                  {campaign.sent_count > 0 && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                      {((campaign.replies_count / campaign.sent_count) * 100).toFixed(1)}%
-                    </p>
-                  )}
-                </div>
-                <div className="text-center p-2 bg-muted/30 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Reuniões</p>
-                  <p className="text-lg font-bold text-foreground">{campaign.meetings_count}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {new Date(campaign.created_at).toLocaleDateString()}
-                </span>
-                <span>Limite: {campaign.daily_limit}/dia</span>
-              </div>
-            </div>
+            <CampaignCard key={campaign.id} campaign={campaign} />
           ))}
+        </div>
+      ) : (
+        <div className="glass-card rounded-xl overflow-hidden border border-border/50">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/20">
+                <th className="py-3 px-4 w-10">
+                  <Checkbox
+                    checked={filteredCampaigns && filteredCampaigns.length > 0 && selectedCampaignIds.length === filteredCampaigns.length}
+                    onCheckedChange={toggleAllSelection}
+                  />
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase">Campanha</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Status</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Métricas (E/R/M)</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Taxa</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCampaigns?.map((campaign) => (
+                <tr
+                  key={campaign.id}
+                  className={`border-b border-border/40 hover:bg-muted/30 transition-colors ${selectedCampaignIds.includes(campaign.id) ? 'bg-primary/5' : ''}`}
+                >
+                  <td className="py-3 px-4 text-center">
+                    <Checkbox
+                      checked={selectedCampaignIds.includes(campaign.id)}
+                      onCheckedChange={() => toggleCampaignSelection(campaign.id)}
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <p className="font-semibold text-foreground">{campaign.name}</p>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(campaign.status)}`}>
+                      {getStatusLabel(campaign.status)}
+                    </Badge>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <div className="flex items-center justify-center gap-2 font-mono text-xs">
+                      <span title="Enviados">{campaign.sent_count}</span>
+                      <span className="text-muted-foreground">/</span>
+                      <span title="Respostas">{campaign.replies_count}</span>
+                      <span className="text-muted-foreground">/</span>
+                      <span title="Reuniões">{campaign.meetings_count}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    {campaign.sent_count > 0 ? (
+                      <span className="text-xs font-bold text-emerald-500">
+                        {((campaign.replies_count / campaign.sent_count) * 100).toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <CampaignActions campaign={campaign} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -347,6 +411,183 @@ export default function CampaignsPage() {
           onOpenChange={(open) => !open && setSelectedCampaign(null)}
         />
       )}
+
+      {editingCampaign && (
+        <EditCampaignDialog
+          campaign={editingCampaign}
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) setEditingCampaign(null);
+          }}
+        />
+      )}
+
+      {/* Floating Action Bar */}
+      {selectedCampaignIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-foreground text-background px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-md bg-opacity-90">
+            <div className="flex items-center gap-2">
+              <div className="bg-primary text-primary-foreground h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">
+                {selectedCampaignIds.length}
+              </div>
+              <span className="text-sm font-medium">Selecionadas</span>
+            </div>
+
+            <Separator orientation="vertical" className="h-4 bg-white/20" />
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-background hover:text-background hover:bg-white/10"
+                onClick={() => setSelectedCampaignIds([])}
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-emerald-400 hover:text-emerald-400 hover:bg-emerald-400/10"
+                onClick={() => bulkStatusUpdateMutation.mutate({ ids: selectedCampaignIds, status: "active" })}
+                disabled={bulkStatusUpdateMutation.isPending}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Ativar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-amber-400 hover:text-amber-400 hover:bg-amber-400/10"
+                onClick={() => bulkStatusUpdateMutation.mutate({ ids: selectedCampaignIds, status: "paused" })}
+                disabled={bulkStatusUpdateMutation.isPending}
+              >
+                <Pause className="h-4 w-4 mr-2" />
+                Pausar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-400 hover:text-red-400 hover:bg-red-400/10"
+                onClick={() => {
+                  if (confirm(`Excluir ${selectedCampaignIds.length} campanhas permanentemente?`)) {
+                    bulkDeleteMutation.mutate(selectedCampaignIds);
+                  }
+                }}
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
+
+  // Sub-component for Campaign Card to keep main render clean
+  function CampaignCard({ campaign }: { campaign: Campaign }) {
+    const isSelected = selectedCampaignIds.includes(campaign.id);
+    return (
+      <div className={`glass-card rounded-xl p-5 hover:shadow-lg transition-all border ${isSelected ? 'border-primary shadow-md bg-primary/5' : 'border-border/50'}`}>
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => toggleCampaignSelection(campaign.id)}
+              className="mt-1"
+            />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-foreground mb-1 truncate">{campaign.name}</h3>
+              <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(campaign.status)}`}>
+                {getStatusLabel(campaign.status)}
+              </Badge>
+            </div>
+          </div>
+          <CampaignActions campaign={campaign} />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="text-center p-2 bg-muted/20 rounded-lg">
+            <p className="text-[10px] text-muted-foreground mb-0.5 uppercase font-bold tracking-tight">Enviados</p>
+            <p className="text-lg font-bold text-foreground">{campaign.sent_count}</p>
+          </div>
+          <div className="text-center p-2 bg-muted/20 rounded-lg">
+            <p className="text-[10px] text-muted-foreground mb-0.5 uppercase font-bold tracking-tight">Respostas</p>
+            <p className="text-lg font-bold text-foreground">{campaign.replies_count}</p>
+            {campaign.sent_count > 0 && (
+              <p className="text-[10px] font-bold text-emerald-500">
+                {((campaign.replies_count / campaign.sent_count) * 100).toFixed(0)}%
+              </p>
+            )}
+          </div>
+          <div className="text-center p-2 bg-muted/20 rounded-lg">
+            <p className="text-[10px] text-muted-foreground mb-0.5 uppercase font-bold tracking-tight">Reuniões</p>
+            <p className="text-lg font-bold text-foreground">{campaign.meetings_count}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {new Date(campaign.created_at).toLocaleDateString()}
+          </span>
+          <span>Limite: {campaign.daily_limit}/DIA</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Sub-component for Campaign Actions to avoid duplication
+  function CampaignActions({ campaign }: { campaign: Campaign }) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => setSelectedCampaign(campaign)}>
+            <Eye className="h-4 w-4 mr-2" />
+            Ver Detalhes
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => {
+            setEditingCampaign(campaign);
+            setEditDialogOpen(true);
+          }}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          {campaign.status === "active" ? (
+            <DropdownMenuItem
+              onClick={() => updateStatusMutation.mutate({ id: campaign.id, status: "paused" })}
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Pausar
+            </DropdownMenuItem>
+          ) : campaign.status === "paused" || campaign.status === "draft" ? (
+            <DropdownMenuItem
+              onClick={() => updateStatusMutation.mutate({ id: campaign.id, status: "active" })}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Ativar
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onClick={() => duplicateMutation.mutate(campaign)}>
+            <Copy className="h-4 w-4 mr-2" />
+            Duplicar
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => deleteMutation.mutate(campaign.id)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 }

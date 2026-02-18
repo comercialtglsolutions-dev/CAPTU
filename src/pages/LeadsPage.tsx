@@ -26,10 +26,13 @@ import {
   MapPin,
   Calendar,
   Star,
-  Info
+  Info,
+  Check,
+  CheckCircle2
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -51,6 +54,9 @@ export default function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [qualificationFilter, setQualificationFilter] = useState<QualificationFilter>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isCampaignDialogOpen, setIsCampaignDialogOpen] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: leads, isLoading, error } = useQuery({
@@ -125,6 +131,58 @@ export default function LeadsPage() {
     },
   });
 
+  // Query for active campaigns
+  const { data: activeCampaigns } = useQuery({
+    queryKey: ["active-campaigns"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("status", "active")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Mutation to add leads to campaign
+  const addToCampaignMutation = useMutation({
+    mutationFn: async ({ campaignId, leadIds }: { campaignId: string; leadIds: string[] }) => {
+      const response = await fetch(`${API_URL}/api/campaigns/${campaignId}/add-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds }),
+      });
+      if (!response.ok) throw new Error("Erro ao adicionar leads à campanha");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Leads adicionados!", {
+        description: `${selectedLeadIds.length} leads foram enfileirados na campanha escolhida.`,
+      });
+      setSelectedLeadIds([]);
+      setIsCampaignDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro", { description: error.message });
+    },
+  });
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev =>
+      prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedLeadIds.length === filtered.length) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(filtered.map(l => l.id));
+    }
+  };
+
   // Combined filter logic with useMemo for performance
   const filtered = useMemo(() => {
     let result = leads;
@@ -196,7 +254,7 @@ export default function LeadsPage() {
               className="gap-2"
             >
               Qualificados
-              <Badge variant="secondary" className="ml-1 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <Badge variant="secondary" className="ml-1 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
                 {leads?.filter((l) => l.score >= 60).length || 0}
               </Badge>
             </Button>
@@ -207,7 +265,7 @@ export default function LeadsPage() {
               className="gap-2"
             >
               Desqualificados
-              <Badge variant="secondary" className="ml-1 text-xs bg-red-500/10 text-red-600 dark:text-red-400">
+              <Badge variant="secondary" className="ml-1 text-xs bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
                 {leads?.filter((l) => l.score < 60).length || 0}
               </Badge>
             </Button>
@@ -240,6 +298,12 @@ export default function LeadsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
+                <th className="py-3 px-4 w-10">
+                  <Checkbox
+                    checked={filtered.length > 0 && selectedLeadIds.length === filtered.length}
+                    onCheckedChange={toggleAllSelection}
+                  />
+                </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Empresa</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cidade</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
@@ -269,7 +333,16 @@ export default function LeadsPage() {
                 </tr>
               ) : (
                 filtered.map((lead) => (
-                  <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                  <tr
+                    key={lead.id}
+                    className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${selectedLeadIds.includes(lead.id) ? 'bg-primary/5' : ''}`}
+                  >
+                    <td className="py-3 px-4">
+                      <Checkbox
+                        checked={selectedLeadIds.includes(lead.id)}
+                        onCheckedChange={() => toggleLeadSelection(lead.id)}
+                      />
+                    </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-foreground">{lead.name}</div>
                       <div className="text-[10px] text-muted-foreground">{lead.segment || "Sem segmento"}</div>
@@ -310,118 +383,88 @@ export default function LeadsPage() {
       </div>
 
       {/* Lead Details Dialog */}
-      <Dialog open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={!!selectedLead}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+      />
+
+      {/* Campaign Selection Dialog */}
+      <Dialog open={isCampaignDialogOpen} onOpenChange={setIsCampaignDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Building2 className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl">{selectedLead?.name}</DialogTitle>
-                <DialogDescription>{selectedLead?.segment || "Lead Coletado"}</DialogDescription>
-              </div>
-            </div>
+            <DialogTitle>Adicionar à Campanha</DialogTitle>
+            <DialogDescription>
+              Selecione em qual campanha deseja enfileirar os {selectedLeadIds.length} leads selecionados.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto px-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-              {/* Coluna Esquerda: Dados */}
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                    <Info className="h-4 w-4 text-primary" />
-                    Informações Gerais
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-2 text-sm text-foreground">
-                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                      <span>{selectedLead?.address || `${selectedLead?.city}, ${selectedLead?.state || 'Local não informado'}`}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedLead?.phone || "Não disponível"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedLead?.email || "E-mail não detectado"}</span>
-                    </div>
-                    {selectedLead?.website ? (
-                      <div className="flex items-center gap-2 text-sm text-primary">
-                        <Globe className="h-4 w-4" />
-                        <a href={selectedLead.website} target="_blank" rel="noreferrer" className="hover:underline">
-                          {selectedLead.website}
-                        </a>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-destructive font-medium">
-                        <Globe className="h-4 w-4" />
-                        <span>Sem presença digital (site)</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                    <Star className="h-4 w-4 text-primary" />
-                    Qualificação (Score)
-                  </h4>
-                  <div className="glass-card p-4 rounded-lg bg-muted/30 border border-border/40">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm font-medium text-foreground">Pontuação Total:</span>
-                      <ScoreBadge score={selectedLead?.score || 0} />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-foreground">
-                        <span className="text-muted-foreground">Rating Google:</span>
-                        <span className="font-medium">⭐ {selectedLead?.rating || "N/A"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-foreground">
-                        <span className="text-muted-foreground">Avaliações:</span>
-                        <span className="font-medium">{selectedLead?.user_ratings_total || 0} total</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Coluna Direita: Histórico */}
-              <div className="space-y-4 border-l pl-6 border-border/50">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground mb-4">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  Histórico de Contatos
-                </h4>
-
-                <LeadHistory leadId={selectedLead?.id} />
-              </div>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Escolha a Campanha Ativa:</Label>
+              <Select onValueChange={setSelectedCampaignId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma campanha..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCampaigns?.map((campaign: any) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
-          <Separator className="my-4" />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-              <span>Coletado em: {selectedLead?.created_at ? new Date(selectedLead.created_at).toLocaleDateString() : '-'}</span>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)}>Fechar</Button>
-              <Button
-                size="sm"
-                className="bg-primary hover:bg-primary/90"
-                onClick={() => {
-                  mutation.mutate(selectedLead.id);
-                  // Não fecha o modal para ver o toast
-                }}
-                disabled={mutation.isPending}
-              >
-                {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                Iniciar Prospecção
-              </Button>
-            </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsCampaignDialogOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!selectedCampaignId || addToCampaignMutation.isPending}
+              onClick={() => selectedCampaignId && addToCampaignMutation.mutate({
+                campaignId: selectedCampaignId,
+                leadIds: selectedLeadIds
+              })}
+            >
+              {addToCampaignMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              Confirmar Enfileiramento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Action Bar */}
+      {selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-foreground text-background px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-md bg-opacity-90">
+            <div className="flex items-center gap-2">
+              <div className="bg-primary text-primary-foreground h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">
+                {selectedLeadIds.length}
+              </div>
+              <span className="text-sm font-medium">Selecionados</span>
+            </div>
+
+            <Separator orientation="vertical" className="h-4 bg-white/20" />
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-background hover:text-background hover:bg-white/10"
+                onClick={() => setSelectedLeadIds([])}
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4"
+                onClick={() => setIsCampaignDialogOpen(true)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Adicionar à Campanha
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

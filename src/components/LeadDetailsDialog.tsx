@@ -24,6 +24,7 @@ interface Lead {
   rating?: number;
   user_ratings_total?: number;
   created_at?: string;
+  updated_at?: string;
   status?: string;
 }
 
@@ -61,79 +62,113 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+      <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-background">
+        {/* Header Dialog w/ Gradient */}
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/20 shadow-inner">
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-xl">{lead.name}</DialogTitle>
-              <DialogDescription>{lead.segment || "Lead Coletado"}</DialogDescription>
+              <DialogTitle className="text-xl font-bold text-foreground">{lead.name}</DialogTitle>
+              <div className="flex items-center gap-2 mt-0.5">
+                <DialogDescription className="text-sm text-muted-foreground">{lead.segment || "Lead Coletado"}</DialogDescription>
+                <Separator orientation="vertical" className="h-3" />
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  {lead.city}, {lead.state}
+                </div>
+              </div>
             </div>
           </div>
-        </DialogHeader>
+        </div>
 
-        <div className="flex-1 overflow-y-auto px-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-            {/* Coluna Esquerda: Dados */}
-            <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 h-full">
+            {/* Sidebar Info */}
+            <div className="md:col-span-1 bg-muted/30 p-6 space-y-6 border-r border-border/50">
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                  <Info className="h-4 w-4 text-primary" />
-                  Informações Gerais
+                <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Info className="h-3 w-3" />
+                  Detalhes do Lead
                 </h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-2 text-sm text-foreground">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <span>{lead.address || `${lead.city}, ${lead.state || 'Local não informado'}`}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-foreground">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{lead.phone || "Não disponível"}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-foreground">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{lead.email || "E-mail não detectado"}</span>
-                  </div>
-                  {lead.website ? (
-                    <div className="flex items-center gap-2 text-sm text-primary">
-                      <Globe className="h-4 w-4" />
-                      <a href={lead.website} target="_blank" rel="noreferrer" className="hover:underline">
-                        {lead.website}
-                      </a>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                      <MapPin className="h-3 w-3 text-primary" />
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-sm text-destructive font-medium">
-                      <Globe className="h-4 w-4" />
-                      <span>Sem presença digital (site)</span>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Localização</p>
+                      <p className="text-xs font-medium text-foreground leading-snug">{lead.address || `${lead.city}, ${lead.state}`}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                      <Phone className="h-3 w-3 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Telefone</p>
+                      <p className="text-xs font-medium text-foreground">{lead.phone || "Não informado"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                      <Globe className="h-3 w-3 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Website</p>
+                      {lead.website ? (
+                        <a href={lead.website} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline break-all">
+                          {lead.website}
+                        </a>
+                      ) : (
+                        <p className="text-xs font-medium text-muted-foreground italic">Não disponível</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {lead.email && (
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                        <Mail className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Email</p>
+                        <p className="text-xs font-medium text-foreground break-all">{lead.email}</p>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
+              <Separator className="bg-border/50" />
+
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                  <Star className="h-4 w-4 text-primary" />
-                  Qualificação (Score)
+                <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Star className="h-3 w-3" />
+                  Qualificação
                 </h4>
-                <div className="glass-card p-4 rounded-lg bg-muted/30 border border-border/40">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-medium text-foreground">Pontuação Total:</span>
-                    <ScoreBadge score={lead.score || 0} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-foreground">
-                      <span className="text-muted-foreground">Rating Google:</span>
-                      <span className="font-medium">⭐ {lead.rating || "N/A"}</span>
+                <div className="glass-card p-4 rounded-xl space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <span className="text-xs font-medium text-foreground">Score</span>
+                      <ScoreBadge score={lead.score || 0} />
                     </div>
-                    <div className="flex items-center justify-between text-xs text-foreground">
+                  </div>
+
+                  <div className="pt-2 space-y-2 border-t border-border/50">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-muted-foreground">Rating Google:</span>
+                      <span className="font-medium text-foreground">⭐ {lead.rating || "N/A"}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-foreground">
                       <span className="text-muted-foreground">Avaliações:</span>
                       <span className="font-medium">{lead.user_ratings_total || 0} total</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-foreground">
+                    <div className="flex items-center justify-between text-[11px] text-foreground">
                       <span className="text-muted-foreground">Site Próprio:</span>
-                      <Badge variant={lead.has_own_website ? "outline" : "destructive"} className="text-[10px] h-4">
+                      <Badge variant={lead.has_own_website ? "outline" : "destructive"} className="text-[9px] h-3.5 px-1">
                         {lead.has_own_website ? "Sim" : "Não"}
                       </Badge>
                     </div>
@@ -143,34 +178,40 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
             </div>
 
             {/* Coluna Direita: Histórico */}
-            <div className="space-y-4 border-l pl-6 border-border/50">
-              <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground mb-4">
-                <Calendar className="h-4 w-4 text-primary" />
-                Histórico de Contatos
-              </h4>
+            <div className="md:col-span-2 p-6 space-y-5">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  Histórico de Contatos
+                </h4>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded-sm tracking-widest">
+                  Atividade: {lead.updated_at ? new Date(lead.updated_at).toLocaleDateString() : "-"}
+                </span>
+              </div>
 
               <LeadHistory leadId={lead.id} />
             </div>
           </div>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-0 bg-border/50" />
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+        <div className="px-6 py-4 bg-muted/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-tight">
+            <Calendar className="h-3 w-3" />
             <span>Coletado em: {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</span>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Fechar</Button>
+            <Button variant="ghost" size="sm" className="font-semibold text-xs" onClick={() => onOpenChange(false)}>Fechar</Button>
             <Button
               size="sm"
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 px-4 text-xs"
               onClick={() => {
                 mutation.mutate(lead.id);
               }}
               disabled={mutation.isPending}
             >
-              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              {mutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Send className="h-3 w-3 mr-2" />}
               Iniciar Prospecção
             </Button>
           </div>

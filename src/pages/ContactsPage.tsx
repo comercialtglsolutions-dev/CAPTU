@@ -8,13 +8,7 @@ import { toast } from "sonner";
 import ScoreBadge from "@/components/ScoreBadge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { LeadDetailsDialog } from "@/components/LeadDetailsDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,36 +54,36 @@ const FUNNEL_STAGES: { id: FunnelStage; label: string; color: string; headerColo
   {
     id: "contacted",
     label: "Contatado",
-    color: "bg-blue-50/50 border-blue-100",
-    headerColor: "text-blue-700 bg-blue-100",
+    color: "bg-blue-50/50 dark:bg-blue-500/5 border-blue-100 dark:border-blue-500/10",
+    headerColor: "text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/20",
     icon: "📩"
   },
   {
     id: "responded",
     label: "Respondido",
-    color: "bg-purple-50/50 border-purple-100",
-    headerColor: "text-purple-700 bg-purple-100",
+    color: "bg-purple-50/50 dark:bg-purple-500/5 border-purple-100 dark:border-purple-500/10",
+    headerColor: "text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-500/20",
     icon: "💬"
   },
   {
     id: "negotiating",
     label: "Em negociação",
-    color: "bg-orange-50/50 border-orange-100",
-    headerColor: "text-orange-700 bg-orange-100",
+    color: "bg-orange-50/50 dark:bg-orange-500/5 border-orange-100 dark:border-orange-500/10",
+    headerColor: "text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-500/20",
     icon: "🤝"
   },
   {
     id: "won",
     label: "Fechado",
-    color: "bg-green-50/50 border-green-100",
-    headerColor: "text-green-700 bg-green-100",
+    color: "bg-green-50/50 dark:bg-green-500/5 border-green-100 dark:border-green-500/10",
+    headerColor: "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-500/20",
     icon: "⭐"
   },
   {
     id: "lost",
     label: "Perdido",
-    color: "bg-red-50/50 border-red-100",
-    headerColor: "text-red-700 bg-red-100",
+    color: "bg-red-50/50 dark:bg-red-500/5 border-red-100 dark:border-red-500/10",
+    headerColor: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20",
     icon: "❌"
   },
 ];
@@ -194,20 +188,20 @@ export default function ContactsPage() {
         description="Gerencie suas oportunidades e acompanhe o progresso de cada negociação."
       />
 
-      <div className="flex-1 overflow-x-auto pb-4">
+      <div className="flex-1 pb-4">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 min-w-[1200px] h-full">
+          <div className="flex gap-4 h-full">
             {FUNNEL_STAGES.map((stage) => {
               const stageLeads = getLeadsByStage(stage.id);
               return (
-                <div key={stage.id} className="flex flex-col w-80 shrink-0">
+                <div key={stage.id} className="flex flex-col flex-1 min-w-0">
                   {/* Column Header */}
-                  <div className={`p-3 rounded-t-xl border-b flex items-center justify-between mb-2 bg-white shadow-sm border-gray-100`}>
+                  <div className={`p-3 rounded-t-xl border-b flex items-center justify-between mb-2 bg-card shadow-sm border-border/50`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${stage.headerColor}`}>
                         {stage.icon}
                       </div>
-                      <h3 className="font-semibold text-gray-700 text-sm">
+                      <h3 className="font-semibold text-foreground text-sm">
                         {stage.label}
                       </h3>
                     </div>
@@ -223,8 +217,8 @@ export default function ContactsPage() {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={`flex-1 p-2 rounded-xl transition-all duration-300 relative ${snapshot.isDraggingOver
-                            ? "bg-primary/5 ring-2 ring-primary/20 ring-inset"
-                            : "bg-gray-50/50"
+                          ? "bg-primary/5 ring-2 ring-primary/20 ring-inset"
+                          : "bg-muted/30"
                           }`}
                       >
                         <div className="space-y-3 h-full overflow-y-auto max-h-[calc(100vh-250px)] pr-1 custom-scrollbar">
@@ -235,7 +229,7 @@ export default function ContactsPage() {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  className={`group relative bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing ${snapshot.isDragging ? "shadow-xl rotate-1 scale-105 z-50 ring-2 ring-primary" : ""
+                                  className={`group relative bg-card p-4 rounded-xl border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing ${snapshot.isDragging ? "shadow-xl rotate-1 scale-105 z-50 ring-2 ring-primary" : ""
                                     }`}
                                   onMouseEnter={() => setHoveredCard(lead.id)}
                                   onMouseLeave={() => setHoveredCard(null)}
@@ -243,16 +237,16 @@ export default function ContactsPage() {
                                   {/* Header do Card */}
                                   <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-3 overflow-hidden">
-                                      <Avatar className="h-8 w-8 bg-gray-100 border border-gray-200 shrink-0">
-                                        <AvatarFallback className="text-xs font-bold text-gray-500 bg-gray-50">
+                                      <Avatar className="h-8 w-8 bg-muted border border-border shrink-0">
+                                        <AvatarFallback className="text-xs font-bold text-muted-foreground bg-muted/50">
                                           {getInitials(lead.name)}
                                         </AvatarFallback>
                                       </Avatar>
                                       <div className="min-w-0">
-                                        <h4 className="font-semibold text-sm text-gray-900 truncate" title={lead.name}>
+                                        <h4 className="font-semibold text-sm text-foreground truncate" title={lead.name}>
                                           {lead.name}
                                         </h4>
-                                        <p className="text-xs text-gray-500 truncate">
+                                        <p className="text-xs text-muted-foreground truncate">
                                           {lead.segment}
                                         </p>
                                       </div>
@@ -263,7 +257,7 @@ export default function ContactsPage() {
                                       <DropdownMenuTrigger asChild>
                                         <Button
                                           variant="ghost"
-                                          className="h-6 w-6 p-0 text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                           <MoreHorizontal className="h-4 w-4" />
                                         </Button>
@@ -274,7 +268,7 @@ export default function ContactsPage() {
                                           Ver detalhes
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                           onClick={() => {
                                             setLeadToDelete(lead);
                                             setDeleteDialogOpen(true);
@@ -291,19 +285,19 @@ export default function ContactsPage() {
                                   <div className="flex flex-wrap gap-2 mb-3">
                                     <ScoreBadge score={lead.score} />
                                     {lead.rating && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-100">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                                         ⭐ {lead.rating}
                                       </span>
                                     )}
                                   </div>
 
                                   {/* Footer Info */}
-                                  <div className="space-y-1.5 pt-2 border-t border-gray-50">
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <div className="space-y-1.5 pt-2 border-t border-border/40">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                       <MapPin className="h-3 w-3 shrink-0" />
                                       <span className="truncate">{lead.city}, {lead.state}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
                                       <span className="text-[10px]">Atualizado em {
                                         lead.updated_at
                                           ? format(new Date(lead.updated_at), "dd MMM", { locale: ptBR })
@@ -318,7 +312,7 @@ export default function ContactsPage() {
                           {provided.placeholder}
 
                           {stageLeads.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-32 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground border-2 border-dashed border-border/50 rounded-xl bg-muted/20">
                               <span className="text-2xl opacity-20 mb-2">{stage.icon}</span>
                               <span className="text-sm font-medium">Vazio</span>
                             </div>
@@ -334,103 +328,11 @@ export default function ContactsPage() {
         </DragDropContext>
       </div>
 
-      {/* Lead Details Dialog */}
-      <Dialog open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
-          {/* Header Dialog w/ Gradient */}
-          <div className="bg-gradient-to-r from-gray-50 to-white border-b px-6 py-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-4 border-white shadow-sm">
-                <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">
-                  {selectedLead ? getInitials(selectedLead.name) : ""}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <DialogTitle className="text-2xl text-gray-900">{selectedLead?.name}</DialogTitle>
-                <p className="text-muted-foreground">{selectedLead?.segment}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-3 h-full">
-              {/* Sidebar Info */}
-              <div className="md:col-span-1 bg-gray-50/50 p-6 space-y-6 border-r h-full">
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Detalhes do Lead</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <MapPin className="h-4 w-4 text-gray-400 mt-1" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Localização</p>
-                        <p className="text-sm text-gray-600">{selectedLead?.address || `${selectedLead?.city}, ${selectedLead?.state}`}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Phone className="h-4 w-4 text-gray-400 mt-1" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Telefone</p>
-                        <p className="text-sm text-gray-600">{selectedLead?.phone || "Não informado"}</p>
-                      </div>
-                    </div>
-                    {selectedLead?.email && (
-                      <div className="flex items-start gap-3">
-                        <Mail className="h-4 w-4 text-gray-400 mt-1" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Email</p>
-                          <p className="text-sm text-gray-600 break-all">{selectedLead.email}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Métricas</h4>
-                  <div className="bg-white p-4 rounded-lg border shadow-sm space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Score</span>
-                      <ScoreBadge score={selectedLead?.score || 0} />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Avaliação</span>
-                      <span className="text-sm font-medium flex items-center gap-1">
-                        ⭐ {selectedLead?.rating || "-"}
-                        <span className="text-xs text-gray-400 font-normal">({selectedLead?.user_ratings_total || 0})</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Content History */}
-              <div className="md:col-span-2 p-6 bg-white">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-semibold text-gray-900">Histórico de Atividades</h4>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                    Última atualização: {selectedLead?.updated_at ? format(new Date(selectedLead.updated_at), "dd/MM/yyyy HH:mm") : "-"}
-                  </span>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-gray-200 h-[400px] overflow-y-auto">
-                  <LeadHistory leadId={selectedLead?.id || ""} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setSelectedLead(null)}>
-              Fechar
-            </Button>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Phone className="h-4 w-4 mr-2" />
-              Entrar em Contato
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={!!selectedLead}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
     Dialog,
@@ -8,21 +9,26 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Users, MessageSquare, TrendingUp, Calendar } from "lucide-react";
+import { Loader2, Users, MessageSquare, TrendingUp, Calendar, Trash2 } from "lucide-react";
 import ScoreBadge from "@/components/ScoreBadge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { API_URL } from "@/config";
+
+type CampaignStatus = "draft" | "active" | "paused" | "completed";
 
 interface Campaign {
     id: string;
     name: string;
-    description: string;
-    status: string;
-    message_template: string;
+    status: CampaignStatus;
+    niche: string;
     daily_limit: number;
     sent_count: number;
     replies_count: number;
     meetings_count: number;
     created_at: string;
-    filters: any;
+    updated_at: string;
 }
 
 interface CampaignDetailsDialogProps {
@@ -32,6 +38,9 @@ interface CampaignDetailsDialogProps {
 }
 
 export function CampaignDetailsDialog({ campaign, open, onOpenChange }: CampaignDetailsDialogProps) {
+    const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+    const queryClient = useQueryClient();
+
     const { data: campaignLeads, isLoading } = useQuery({
         queryKey: ["campaign-leads", campaign.id],
         queryFn: async () => {
@@ -40,13 +49,49 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
                 .select("*, leads(*)")
                 .eq("campaign_id", campaign.id)
                 .order("created_at", { ascending: false })
-                .limit(10);
+                .limit(50);
 
             if (error) throw error;
             return data;
         },
         enabled: open,
     });
+
+    const removeLeadsMutation = useMutation({
+        mutationFn: async (leadIds: string[]) => {
+            const response = await fetch(`${API_URL}/api/campaigns/${campaign.id}/leads`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ leadIds }),
+            });
+            if (!response.ok) throw new Error("Erro ao remover leads");
+            return response.json();
+        },
+        onSuccess: () => {
+            toast.success("Leads removidos", {
+                description: `${selectedLeadIds.length} leads foram removidos desta campanha.`
+            });
+            setSelectedLeadIds([]);
+            queryClient.invalidateQueries({ queryKey: ["campaign-leads", campaign.id] });
+        },
+        onError: (error: any) => {
+            toast.error("Erro", { description: error.message });
+        }
+    });
+
+    const toggleAll = () => {
+        if (selectedLeadIds.length === campaignLeads?.length) {
+            setSelectedLeadIds([]);
+        } else {
+            setSelectedLeadIds(campaignLeads?.map((cl: any) => cl.lead_id) || []);
+        }
+    };
+
+    const toggleLead = (leadId: string) => {
+        setSelectedLeadIds(prev =>
+            prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]
+        );
+    };
 
     const responseRate = campaign.sent_count > 0
         ? ((campaign.replies_count / campaign.sent_count) * 100).toFixed(1)
@@ -57,7 +102,6 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
             <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="text-xl">{campaign.name}</DialogTitle>
-                    <p className="text-sm text-muted-foreground">{campaign.description || "Sem descrição"}</p>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto px-1">
@@ -91,7 +135,7 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
                     <div className="mb-6">
                         <h4 className="text-sm font-semibold mb-2">Template de Mensagem</h4>
                         <div className="glass-card p-4 rounded-lg bg-muted/30">
-                            <p className="text-sm text-foreground whitespace-pre-wrap">{campaign.message_template}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{campaign.niche}</p>
                         </div>
                     </div>
 
@@ -99,7 +143,37 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
 
                     {/* Campaign Leads */}
                     <div>
-                        <h4 className="text-sm font-semibold mb-3">Leads na Campanha (Últimos 10)</h4>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                                <h4 className="text-sm font-semibold">Leads na Campanha</h4>
+                                {campaignLeads && campaignLeads.length > 0 && (
+                                    <div className="flex items-center gap-2 ml-2">
+                                        <Checkbox
+                                            checked={selectedLeadIds.length > 0 && selectedLeadIds.length === campaignLeads.length}
+                                            onCheckedChange={toggleAll}
+                                        />
+                                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Selecionar todos</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {selectedLeadIds.length > 0 && (
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-7 px-3 text-xs"
+                                    onClick={() => removeLeadsMutation.mutate(selectedLeadIds)}
+                                    disabled={removeLeadsMutation.isPending}
+                                >
+                                    {removeLeadsMutation.isPending ? (
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                    ) : (
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                    )}
+                                    Remover ({selectedLeadIds.length})
+                                </Button>
+                            )}
+                        </div>
                         {isLoading ? (
                             <div className="flex justify-center p-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -111,7 +185,14 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
                         ) : (
                             <div className="space-y-2">
                                 {campaignLeads?.map((cl: any) => (
-                                    <div key={cl.id} className="glass-card p-3 rounded-lg flex items-center justify-between">
+                                    <div
+                                        key={cl.id}
+                                        className={`glass-card p-3 rounded-lg flex items-center gap-3 transition-colors ${selectedLeadIds.includes(cl.lead_id) ? 'bg-primary/5 border-primary/20' : ''}`}
+                                    >
+                                        <Checkbox
+                                            checked={selectedLeadIds.includes(cl.lead_id)}
+                                            onCheckedChange={() => toggleLead(cl.lead_id)}
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-sm text-foreground truncate">{cl.leads.name}</p>
                                             <p className="text-xs text-muted-foreground">
