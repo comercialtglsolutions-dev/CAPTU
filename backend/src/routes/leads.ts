@@ -50,14 +50,25 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/leads/collect - Coleta novos leads via Google Places
 router.post('/collect', async (req, res) => {
-    const { query, city } = req.body;
+    const { query, city, radius, minRating, minReviews, onlyWithoutWebsite, onlyWithPhone } = req.body;
 
     if (!query || !city) {
         return res.status(400).json({ error: 'Query and city are required' });
     }
 
     try {
-        const leads = await searchLeads(query, city);
+        // Monta objeto de filtros
+        const filters = {
+            radius: radius || 10000,
+            minRating: minRating || 0,
+            minReviews: minReviews || 0,
+            onlyWithoutWebsite: onlyWithoutWebsite || false,
+            onlyWithPhone: onlyWithPhone || false
+        };
+
+        console.log('Buscando leads com filtros:', filters);
+
+        const leads = await searchLeads(query, city, filters);
 
         // Formata os dados para o banco conforme a estratégia
         const formattedLeads = leads.map((l: any) => ({

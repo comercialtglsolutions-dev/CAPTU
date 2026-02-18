@@ -3,7 +3,15 @@ import { calculateScore, LeadData } from './leadScoring';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
-export const searchLeads = async (query: string, city: string) => {
+interface SearchFilters {
+    radius?: number;
+    minRating?: number;
+    minReviews?: number;
+    onlyWithoutWebsite?: boolean;
+    onlyWithPhone?: boolean;
+}
+
+export const searchLeads = async (query: string, city: string, filters: SearchFilters = {}) => {
     if (!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY === 'SUA_CHAVE_AQUI') {
         console.warn('Google Places API Key not configured. Returning mock data.');
         return getMockLeads(query, city);
@@ -24,12 +32,13 @@ export const searchLeads = async (query: string, city: string) => {
 
         const { lat, lng } = geoResponse.data.results[0].geometry.location;
 
-        // 2. Consulta Places API (Text Search)
+        // 2. Consulta Places API (Text Search) com raio personalizado
+        const searchRadius = filters.radius || 10000; // padrão 10km
         const placesResponse = await axios.get(`https://maps.googleapis.com/maps/api/place/textsearch/json`, {
             params: {
                 query: `${query} em ${city}`,
                 location: `${lat},${lng}`,
-                radius: 10000,
+                radius: searchRadius,
                 key: GOOGLE_PLACES_API_KEY
             }
         });
@@ -104,7 +113,36 @@ export const searchLeads = async (query: string, city: string) => {
             })
         );
 
-        return detailedLeads.filter(l => l !== null);
+        // 4. Aplica filtros avançados
+        let filteredLeads = detailedLeads.filter(l => l !== null);
+
+        // Filtro de avaliação mínima
+        if (filters.minRating && filters.minRating > 0) {
+            filteredLeads = filteredLeads.filter(lead =>
+                lead.rating && lead.rating >= filters.minRating!
+            );
+        }
+
+        // Filtro de número mínimo de avaliações
+        if (filters.minReviews && filters.minReviews > 0) {
+            filteredLeads = filteredLeads.filter(lead =>
+                lead.user_ratings_total && lead.user_ratings_total >= filters.minReviews!
+            );
+        }
+
+        // Filtro de empresas sem site
+        if (filters.onlyWithoutWebsite) {
+            filteredLeads = filteredLeads.filter(lead => !lead.has_own_website);
+        }
+
+        // Filtro de telefone obrigatório
+        if (filters.onlyWithPhone) {
+            filteredLeads = filteredLeads.filter(lead => lead.phone);
+        }
+
+        console.log(`Filtros aplicados: ${filteredLeads.length} leads de ${detailedLeads.length} originais`);
+
+        return filteredLeads;
 
     } catch (error) {
         console.error('Error searching leads:', error);

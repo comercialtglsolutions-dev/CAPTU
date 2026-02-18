@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import leadRoutes from './routes/leads'; // Lead routes module
+import leadRoutes from './routes/leads';
+import campaignRoutes from './routes/campaigns';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,6 +12,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/leads', leadRoutes);
+app.use('/api/campaigns', campaignRoutes);
 
 app.get('/', (req, res) => {
     res.send('CAPTU Backend API is running');
