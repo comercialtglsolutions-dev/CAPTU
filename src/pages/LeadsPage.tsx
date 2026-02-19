@@ -28,7 +28,8 @@ import {
   Star,
   Info,
   Check,
-  CheckCircle2
+  CheckCircle2,
+  Trash2
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,6 +167,30 @@ export default function LeadsPage() {
     },
     onError: (error: any) => {
       toast.error("Erro", { description: error.message });
+    },
+  });
+
+  // Mutation to delete leads
+  const deleteMutation = useMutation({
+    mutationFn: async (leadIds: string[]) => {
+      const response = await fetch(`${API_URL}/api/leads/bulk-delete`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds }),
+      });
+      if (!response.ok) throw new Error("Erro ao excluir leads");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast.success("Leads excluídos!", {
+        description: `${data.count} leads foram removidos da base de dados.`,
+      });
+      setSelectedLeadIds([]);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["segments"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir", { description: error.message });
     },
   });
 
@@ -460,6 +485,24 @@ export default function LeadsPage() {
               >
                 <Send className="h-4 w-4 mr-2" />
                 Adicionar à Campanha
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="font-semibold px-4"
+                onClick={() => {
+                  if (window.confirm(`Tem certeza que deseja excluir ${selectedLeadIds.length} leads permanentemente?`)) {
+                    deleteMutation.mutate(selectedLeadIds);
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Excluir
               </Button>
             </div>
           </div>

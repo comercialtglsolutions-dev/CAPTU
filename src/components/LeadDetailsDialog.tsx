@@ -62,7 +62,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-background">
+      <DialogContent className="max-w-4xl h-[95vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-background">
         {/* Header Dialog w/ Gradient */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
@@ -178,8 +178,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
             </div>
 
             {/* Coluna Direita: Histórico */}
-            <div className="md:col-span-2 p-6 space-y-5">
-              <div className="flex items-center justify-between mb-1">
+            <div className="md:col-span-2 p-6 flex flex-col h-[calc(95vh-150px)]">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
                   Histórico de Contatos
@@ -189,7 +189,9 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
                 </span>
               </div>
 
-              <LeadHistory leadId={lead.id} />
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <LeadHistory leadId={lead.id} phone={lead.phone} />
+              </div>
             </div>
           </div>
         </div>

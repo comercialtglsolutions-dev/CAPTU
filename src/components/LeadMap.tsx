@@ -4,6 +4,14 @@ import { Loader2, ExternalLink, TrendingUp, MapPin, Star, Target, Phone, Globe }
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Filter } from "lucide-react";
 
 interface Lead {
     id: string;
@@ -23,6 +31,8 @@ interface Lead {
     address?: string;
     has_own_website?: boolean;
 }
+
+type QualificationFilter = "all" | "qualified" | "unqualified";
 
 interface LeadMapProps {
     leads: Lead[];
@@ -75,6 +85,8 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [segmentFilter, setSegmentFilter] = useState<string>("all");
+    const [qualificationFilter, setQualificationFilter] = useState<QualificationFilter>("all");
 
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map);
@@ -104,12 +116,39 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
         [leads]
     );
 
+    const segments = useMemo(() => {
+        const uniqueSegments = new Set<string>();
+        leads.forEach(l => {
+            if (l.segment) uniqueSegments.add(l.segment);
+        });
+        return Array.from(uniqueSegments).sort();
+    }, [leads]);
+
+    const filteredLeads = useMemo(() => {
+        let result = validLeads;
+
+        if (segmentFilter !== "all") {
+            result = result.filter(l => l.segment === segmentFilter);
+        }
+
+        if (qualificationFilter === "qualified") {
+            result = result.filter(l => l.score >= 60);
+        } else if (qualificationFilter === "unqualified") {
+            result = result.filter(l => l.score < 60);
+        }
+
+        return result;
+    }, [validLeads, segmentFilter, qualificationFilter]);
+
     const center = useMemo(() => {
+        if (filteredLeads.length > 0) {
+            return { lat: Number(filteredLeads[0].latitude), lng: Number(filteredLeads[0].longitude) };
+        }
         if (validLeads.length > 0) {
             return { lat: Number(validLeads[0].latitude), lng: Number(validLeads[0].longitude) };
         }
         return { lat: -23.5505, lng: -46.6333 }; // São Paulo
-    }, [validLeads]);
+    }, [filteredLeads, validLeads]);
 
     const handleMarkerClick = (lead: Lead) => {
         setSelectedLead(lead);
@@ -136,10 +175,10 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
     return (
         <div
             className={`
-                transition-all duration-300 ease-in-out bg-white
+                transition-all duration-300 ease-in-out bg-white group
                 ${isFullscreen
                     ? 'fixed inset-0 z-50 rounded-none h-screen w-screen'
-                    : 'relative rounded-2xl h-[550px] overflow-hidden border border-border shadow-2xl group'
+                    : 'relative rounded-2xl h-[550px] overflow-hidden border border-border shadow-2xl'
                 }
             `}
         >
@@ -156,7 +195,7 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
                 options={mapOptions}
                 onClick={() => setSelectedLead(null)}
             >
-                {validLeads.map((lead) => (
+                {filteredLeads.map((lead) => (
                     <Marker
                         key={lead.id}
                         position={{ lat: Number(lead.latitude), lng: Number(lead.longitude) }}
@@ -272,17 +311,40 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
             </Button>
 
             {/* Overlay Legend */}
-            <div className="absolute bottom-6 left-6 flex items-center gap-3 bg-white/90 backdrop-blur-md p-2 px-3 rounded-full border border-white/20 shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Alta Qualificação</span>
+            <div className={`absolute bottom-6 left-6 flex items-center gap-3 bg-white/90 backdrop-blur-md p-2 px-3 rounded-full border border-white/20 shadow-xl pointer-events-none transition-all duration-500 ${isFullscreen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 scale-95 group-hover:scale-100'}`}>
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    <Select value={qualificationFilter} onValueChange={(v) => setQualificationFilter(v as QualificationFilter)}>
+                        <SelectTrigger className="h-7 min-w-[110px] bg-transparent border-none text-[10px] font-bold text-slate-600 uppercase tracking-tighter hover:bg-slate-100 p-0 shadow-none ring-0 focus:ring-0">
+                            <SelectValue placeholder="Qualificação" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60]">
+                            <SelectItem value="all" className="text-[10px] uppercase font-bold">Todas Qualificações</SelectItem>
+                            <SelectItem value="qualified" className="text-[10px] uppercase font-bold text-emerald-600">Qualificados (60%+)</SelectItem>
+                            <SelectItem value="unqualified" className="text-[10px] uppercase font-bold text-amber-600">Desqualificados</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
+
                 <div className="w-px h-3 bg-slate-200" />
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Média Qualificação</span>
+
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    <Filter className="h-3 w-3 text-slate-400" />
+                    <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+                        <SelectTrigger className="h-7 min-w-[120px] bg-transparent border-none text-[10px] font-bold text-slate-600 uppercase tracking-tighter hover:bg-slate-100 p-0 shadow-none ring-0 focus:ring-0">
+                            <SelectValue placeholder="Todos os Nichos" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60]">
+                            <SelectItem value="all" className="text-[10px] uppercase font-bold">Todos os Nichos</SelectItem>
+                            {segments.map(segment => (
+                                <SelectItem key={segment} value={segment} className="text-[10px] uppercase font-bold">
+                                    {segment}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
         </div>
     );
 }
+

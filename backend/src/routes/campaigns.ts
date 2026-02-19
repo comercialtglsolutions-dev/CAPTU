@@ -58,6 +58,16 @@ router.get('/active-tasks', async (req, res) => {
                         const cleanPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
                         const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
 
+                        // Processar template de mensagem
+                        let message = campaign.niche || '';
+                        const websiteStatus = lead.has_own_website ? 'já possui um site' : 'ainda não possui um site próprio';
+
+                        message = message.replace(/{{name}}/g, ''); // Limpa o nome
+                        message = message.replace(/{{segment}}/g, lead.segment || '');
+                        message = message.replace(/{{city}}/g, lead.city || '');
+                        message = message.replace(/{{state}}/g, lead.state || '');
+                        message = message.replace(/{{website_status}}/g, websiteStatus);
+
                         tasks.push({
                             campaign_id: campaign.id,
                             campaign_name: campaign.name,
@@ -67,7 +77,7 @@ router.get('/active-tasks', async (req, res) => {
                             email: lead.email,
                             city: lead.city,
                             segment: lead.segment,
-                            message_template: campaign.niche,
+                            message: message, // Texto já processado
                             channel: 'whatsapp',
                             step: 1
                         });
@@ -99,18 +109,37 @@ router.get('/active-tasks', async (req, res) => {
                         query = query.not('id', 'in', `(${excludedIds.join(',')})`);
                     }
 
-                    const { data: leadPool, error: leadError } = await query.limit(quotaForAuto * 2);
+                    const { data: leadPool, error: leadError } = await query.limit(quotaForAuto);
 
                     if (leadError) throw leadError;
 
                     if (leadPool && leadPool.length > 0) {
-                        let taskCount = 0;
                         for (const lead of leadPool) {
-                            if (taskCount >= quotaForAuto) break;
-
                             const cleanPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
-                            if (cleanPhone.length >= 10) {
-                                const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+
+                            // Validação rigorosa: Celular Brasil (DDD + 9 + 8 dígitos = 11 caracteres)
+                            // Remove o 55 inicial se existir para validar o padrão local
+                            const localPhone = cleanPhone.startsWith('55') ? cleanPhone.substring(2) : cleanPhone;
+
+                            const isMobile = localPhone.length === 11 && localPhone.startsWith('9');
+
+                            if (isMobile) {
+                                const formattedPhone = '55' + localPhone;
+
+                                // Processar template de mensagem
+                                let message = campaign.niche || '';
+                                const websiteStatus = lead.has_own_website ? 'já possui um site' : 'ainda não possui um site próprio';
+
+                                // Limpeza profunda do placeholder de nome
+                                message = message.replace(/{{name}}/g, '');
+                                message = message.replace(/\s*,/g, ','); // Remove qualquer espaço ANTES da vírgula
+                                message = message.replace(/Olá,/g, 'Olá, '); // Garante espaço DEPOIS da vírgula
+                                message = message.replace(/\s\s+/g, ' ').trim(); // Remove múltiplos espaços
+
+                                message = message.replace(/{{segment}}/g, lead.segment || '');
+                                message = message.replace(/{{city}}/g, lead.city || '');
+                                message = message.replace(/{{state}}/g, lead.state || '');
+                                message = message.replace(/{{website_status}}/g, websiteStatus);
 
                                 tasks.push({
                                     campaign_id: campaign.id,
@@ -121,11 +150,10 @@ router.get('/active-tasks', async (req, res) => {
                                     email: lead.email,
                                     city: lead.city,
                                     segment: lead.segment,
-                                    message_template: campaign.niche,
+                                    message: message,
                                     channel: 'whatsapp',
                                     step: 1
                                 });
-                                taskCount++;
                             }
                         }
                     }
@@ -175,16 +203,28 @@ router.post('/:id/track-send', async (req, res) => {
             .update({ sent_count: (campaign?.sent_count || 0) + 1 })
             .eq('id', campaignId);
 
-        // 3. Registrar no histórico geral de contatos (para o Dashboard)
-        await supabase
+        // 3. Registrar no histórico geral de contatos (com trava de duplicidade de 30s)
+        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
+        const { data: existingChat } = await supabase
             .from('contact_history')
-            .insert({
-                company_id: lead_id,
-                type: 'whatsapp',
-                message: message,
-                status: 'sent',
-                data_envio: new Date().toISOString()
-            });
+            .select('id')
+            .eq('company_id', lead_id)
+            .eq('message', message)
+            .gte('data_envio', thirtySecondsAgo)
+            .limit(1);
+
+        if (!existingChat || existingChat.length === 0) {
+            await supabase
+                .from('contact_history')
+                .insert({
+                    company_id: lead_id,
+                    type: 'whatsapp',
+                    message: message,
+                    status: 'sent',
+                    direction: 'outbound',
+                    data_envio: new Date().toISOString()
+                });
+        }
 
         // 4. Atualizar o status do lead para 'contacted'
         await supabase

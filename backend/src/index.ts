@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import leadRoutes from './routes/leads';
 import campaignRoutes from './routes/campaigns';
+import chatRoutes from './routes/chat';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,6 +14,7 @@ app.use(express.json());
 // Routes
 app.use('/api/leads', leadRoutes);
 app.use('/api/campaigns', campaignRoutes);
+app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => {
     res.send('CAPTU Backend API is running');
@@ -28,3 +30,4 @@ if (!process.env.VERCEL) {
         console.log(`Server is running on port ${port}`);
     });
 }
+// Server updated for Evolution API integration

@@ -171,4 +171,32 @@ router.post('/:id/history', async (req, res) => {
     }
 });
 
+// DELETE /api/leads/bulk-delete - Exclui leads em massa
+router.delete('/bulk-delete', async (req, res) => {
+    const { leadIds } = req.body;
+
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+        return res.status(400).json({ error: 'leadIds array is required' });
+    }
+
+    try {
+        // Primeiro deletamos as dependências se não houver cascade
+        await supabase.from('contact_history').delete().in('company_id', leadIds);
+        await supabase.from('campaign_leads').delete().in('lead_id', leadIds);
+
+        // Então deletamos os leads
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .in('id', leadIds);
+
+        if (error) throw error;
+
+        res.json({ message: 'Leads deleted successfully', count: leadIds.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
+
