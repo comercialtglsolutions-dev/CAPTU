@@ -62,7 +62,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[95vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-background">
+      <DialogContent className="max-w-4xl w-[calc(100%-2rem)] h-[90vh] md:h-[95vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-background rounded-2xl md:rounded-xl">
         {/* Header Dialog w/ Gradient */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">

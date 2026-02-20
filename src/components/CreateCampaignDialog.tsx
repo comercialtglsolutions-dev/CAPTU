@@ -116,7 +116,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl w-[calc(100%-2rem)] rounded-2xl md:rounded-xl">
                 <DialogHeader>
                     <DialogTitle>Nova Campanha de Prospecção</DialogTitle>
                     <DialogDescription>

@@ -12,13 +12,21 @@ import {
   ChevronRight,
   LogOut,
   Moon,
-  Sun
+  Sun,
+  Menu
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/ThemeProvider";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 import {
   AlertDialog,
@@ -52,6 +60,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -75,10 +89,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar */}
+      {/* Sidebar - Desktop */}
       <aside
         className={cn(
-          "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
+          "hidden lg:flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
           collapsed ? "w-[68px]" : "w-[240px]"
         )}
       >
@@ -119,10 +133,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-
         {/* Bottom */}
         <div className="space-y-1 border-t border-sidebar-border px-2 py-4">
-
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
@@ -178,14 +190,104 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Sair</span>}
           </button>
-
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 lg:p-8">{children}</div>
-      </main>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 shrink-0 relative">
+          <div className="w-10" /> {/* Spacer */}
+          <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <img src="/captu.png" alt="CAPTU Logo" className="h-8 w-auto" style={{ filter: "brightness(1.1)" }} />
+          </Link>
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <button className="flex h-10 w-10 items-center justify-center rounded-md border border-sidebar-border text-sidebar-foreground">
+                <Menu className="h-6 w-6" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] p-0 border-r-sidebar-border bg-sidebar">
+              <SheetHeader className="h-16 border-b border-sidebar-border px-4 flex-row items-center justify-between space-y-0">
+                <SheetTitle className="text-left">
+                  <img src="/captu.png" alt="CAPTU Logo" className="h-6 w-auto" style={{ filter: "brightness(1.1)" }} />
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col h-[calc(100vh-64px)]">
+                <nav className="flex-1 space-y-1 px-2 py-4">
+                  {navItems.map((item) => {
+                    const active = location.pathname === item.to;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
+                          active
+                            ? "bg-sidebar-accent text-sidebar-primary"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                <div className="space-y-1 border-t border-sidebar-border px-2 py-4">
+                  {bottomItems.map((item) => {
+                    const active = location.pathname === item.to;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
+                          active
+                            ? "bg-sidebar-accent text-sidebar-primary"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                  <button
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                  >
+                    {theme === "dark" ? (
+                      <>
+                        <Sun className="h-5 w-5 shrink-0" />
+                        <span>Modo Claro</span>
+                      </>
+                    ) : (
+                      <>
+                        <Moon className="h-5 w-5 shrink-0" />
+                        <span>Modo Escuro</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setLogoutDialogOpen(true)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0" />
+                    <span>Sair</span>
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </header>
+
+        {/* Main */}
+        <main className="flex-1 overflow-auto bg-background">
+          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">{children}</div>
+        </main>
+      </div>
 
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <AlertDialogContent>

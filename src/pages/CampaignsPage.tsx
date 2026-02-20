@@ -239,59 +239,66 @@ export default function CampaignsPage() {
       </PageHeader>
 
       {/* Status Filters */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        <Button
-          variant={statusFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("all")}
-        >
-          Todas
-          <Badge variant="secondary" className="ml-2 text-xs">
-            {stats.all}
-          </Badge>
-        </Button>
-        <Button
-          variant={statusFilter === "active" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("active")}
-        >
-          Ativas
-          <Badge variant="secondary" className="ml-2 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            {stats.active}
-          </Badge>
-        </Button>
-        <Button
-          variant={statusFilter === "paused" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("paused")}
-        >
-          Pausadas
-          <Badge variant="secondary" className="ml-2 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400">
-            {stats.paused}
-          </Badge>
-        </Button>
-        <Button
-          variant={statusFilter === "draft" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("draft")}
-        >
-          Rascunhos
-          <Badge variant="secondary" className="ml-2 text-xs">
-            {stats.draft}
-          </Badge>
-        </Button>
-        <Button
-          variant={statusFilter === "completed" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("completed")}
-        >
-          Concluídas
-          <Badge variant="secondary" className="ml-2 text-xs">
-            {stats.completed}
-          </Badge>
-        </Button>
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1 flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none items-center">
+          <Button
+            variant={statusFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("all")}
+            className="h-9 whitespace-nowrap"
+          >
+            Todas
+            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 h-4 min-w-[20px] justify-center">
+              {stats.all}
+            </Badge>
+          </Button>
+          <Button
+            variant={statusFilter === "active" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("active")}
+            className="h-9 whitespace-nowrap"
+          >
+            Ativas
+            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 h-4 min-w-[20px] justify-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              {stats.active}
+            </Badge>
+          </Button>
+          <Button
+            variant={statusFilter === "paused" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("paused")}
+            className="h-9 whitespace-nowrap"
+          >
+            Pausadas
+            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 h-4 min-w-[20px] justify-center bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              {stats.paused}
+            </Badge>
+          </Button>
+          <Button
+            variant={statusFilter === "draft" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("draft")}
+            className="h-9 whitespace-nowrap"
+          >
+            Rascunhos
+            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 h-4 min-w-[20px] justify-center">
+              {stats.draft}
+            </Badge>
+          </Button>
+          <Button
+            variant={statusFilter === "completed" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("completed")}
+            className="h-9 whitespace-nowrap"
+          >
+            Concluídas
+            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 h-4 min-w-[20px] justify-center">
+              {stats.completed}
+            </Badge>
+          </Button>
+        </div>
 
-        <div className="ml-auto flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/50">
+        <div className="hidden md:flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/50">
           <Button
             variant={viewMode === "list" ? "default" : "ghost"}
             size="sm"
@@ -328,28 +335,28 @@ export default function CampaignsPage() {
             Nova Campanha
           </Button>
         </div>
-      ) : viewMode === "grid" ? (
+      ) : (viewMode === "grid" || (typeof window !== 'undefined' && window.innerWidth < 768)) ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCampaigns?.map((campaign) => (
             <CampaignCard key={campaign.id} campaign={campaign} />
           ))}
         </div>
       ) : (
-        <div className="glass-card rounded-xl overflow-hidden border border-border/50">
+        <div className="glass-card rounded-xl overflow-hidden border border-border/50 hidden md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
-                <th className="py-3 px-4 w-10">
+                <th className="py-4 px-4 w-10 text-center">
                   <Checkbox
                     checked={filteredCampaigns && filteredCampaigns.length > 0 && selectedCampaignIds.length === filteredCampaigns.length}
                     onCheckedChange={toggleAllSelection}
                   />
                 </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase">Campanha</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Status</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Métricas (E/R/M)</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Taxa</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase text-right">Ações</th>
+                <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase">Campanha</th>
+                <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Status</th>
+                <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Métricas (E/R/M)</th>
+                <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase text-center">Taxa</th>
+                <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -358,21 +365,22 @@ export default function CampaignsPage() {
                   key={campaign.id}
                   className={`border-b border-border/40 hover:bg-muted/30 transition-colors ${selectedCampaignIds.includes(campaign.id) ? 'bg-primary/5' : ''}`}
                 >
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-4 px-4 text-center">
                     <Checkbox
                       checked={selectedCampaignIds.includes(campaign.id)}
                       onCheckedChange={() => toggleCampaignSelection(campaign.id)}
                     />
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-4 px-4">
                     <p className="font-semibold text-foreground">{campaign.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{campaign.niche || "Sem nicho definido"}</p>
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-4 px-4 text-center">
                     <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(campaign.status)}`}>
                       {getStatusLabel(campaign.status)}
                     </Badge>
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-4 px-4 text-center">
                     <div className="flex items-center justify-center gap-2 font-mono text-xs">
                       <span title="Enviados">{campaign.sent_count}</span>
                       <span className="text-muted-foreground">/</span>
@@ -381,7 +389,7 @@ export default function CampaignsPage() {
                       <span title="Reuniões">{campaign.meetings_count}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-4 px-4 text-center">
                     {campaign.sent_count > 0 ? (
                       <span className="text-xs font-bold text-emerald-500">
                         {((campaign.replies_count / campaign.sent_count) * 100).toFixed(1)}%
@@ -390,7 +398,7 @@ export default function CampaignsPage() {
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-4 px-4 text-right">
                     <CampaignActions campaign={campaign} />
                   </td>
                 </tr>
@@ -425,22 +433,32 @@ export default function CampaignsPage() {
 
       {/* Floating Action Bar */}
       {selectedCampaignIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-foreground text-background px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-md bg-opacity-90">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary text-primary-foreground h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">
-                {selectedCampaignIds.length}
+        <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300 w-[calc(100%-2rem)] md:w-auto">
+          <div className="bg-foreground text-background md:px-6 py-4 md:py-3 rounded-2xl md:rounded-full shadow-2xl flex flex-col md:flex-row items-center gap-4 md:gap-6 border border-white/10 backdrop-blur-md bg-opacity-90 px-4">
+            <div className="flex items-center justify-between w-full md:w-auto gap-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-primary text-primary-foreground h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">
+                  {selectedCampaignIds.length}
+                </div>
+                <span className="text-sm font-medium">Selecionadas</span>
               </div>
-              <span className="text-sm font-medium">Selecionadas</span>
-            </div>
-
-            <Separator orientation="vertical" className="h-4 bg-white/20" />
-
-            <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-background hover:text-background hover:bg-white/10"
+                className="text-background hover:text-background hover:bg-white/10 md:hidden"
+                onClick={() => setSelectedCampaignIds([])}
+              >
+                Limpar
+              </Button>
+            </div>
+
+            <Separator orientation="vertical" className="hidden md:block h-4 bg-white/20" />
+
+            <div className="flex items-center gap-2 md:gap-4 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none justify-center">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="hidden md:flex text-background hover:text-background hover:bg-white/10"
                 onClick={() => setSelectedCampaignIds([])}
               >
                 Limpar
@@ -448,7 +466,7 @@ export default function CampaignsPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-emerald-400 hover:text-emerald-400 hover:bg-emerald-400/10"
+                className="text-emerald-400 hover:text-emerald-400 hover:bg-emerald-400/10 h-10 md:h-9"
                 onClick={() => bulkStatusUpdateMutation.mutate({ ids: selectedCampaignIds, status: "active" })}
                 disabled={bulkStatusUpdateMutation.isPending}
               >
@@ -458,7 +476,7 @@ export default function CampaignsPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-amber-400 hover:text-amber-400 hover:bg-amber-400/10"
+                className="text-amber-400 hover:text-amber-400 hover:bg-amber-400/10 h-10 md:h-9"
                 onClick={() => bulkStatusUpdateMutation.mutate({ ids: selectedCampaignIds, status: "paused" })}
                 disabled={bulkStatusUpdateMutation.isPending}
               >
@@ -468,7 +486,7 @@ export default function CampaignsPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-red-400 hover:text-red-400 hover:bg-red-400/10"
+                className="text-red-400 hover:text-red-400 hover:bg-red-400/10 h-10 md:h-9"
                 onClick={() => {
                   if (confirm(`Excluir ${selectedCampaignIds.length} campanhas permanentemente?`)) {
                     bulkDeleteMutation.mutate(selectedCampaignIds);

@@ -112,7 +112,7 @@ export default function MetricsPage() {
     <>
       <PageHeader title="Métricas" description="Acompanhe o desempenho das suas campanhas em tempo real" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
         <MetricCard
           icon={Users}
           title="Total de Leads"

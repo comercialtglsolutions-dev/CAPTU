@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, MapPin, Building2, Loader2, CheckCircle2, ChevronDown, ChevronUp, Star, Globe, Phone, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import { API_URL } from "@/config";
 
 export default function SearchPage() {
@@ -82,17 +83,17 @@ export default function SearchPage() {
       <div className="glass-card rounded-xl p-6 mb-8 max-w-4xl">
         {/* Filtros Básicos */}
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="h-3.5 w-3.5" />
+                <Building2 className="h-3.5 w-3.5 text-primary" />
                 Nicho / Segmento
               </Label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="relative group">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   placeholder="Ex: Oficina Mecânica, Restaurante..."
-                  className="pl-10 h-11"
+                  className="pl-10 h-12 md:h-11 transition-all"
                   value={niche}
                   onChange={(e) => setNiche(e.target.value)}
                 />
@@ -100,14 +101,14 @@ export default function SearchPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5" />
+                <MapPin className="h-3.5 w-3.5 text-primary" />
                 Cidade
               </Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="relative group">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   placeholder="Ex: São Paulo, SP"
-                  className="pl-10 h-11"
+                  className="pl-10 h-12 md:h-11 transition-all"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                 />
@@ -355,41 +356,43 @@ export default function SearchPage() {
 
       {results && (
         <div className="space-y-3 animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <p className="text-sm text-muted-foreground">
-              {results.length} empresas processadas para <span className="font-medium text-foreground">"{niche}"</span> em <span className="font-medium text-foreground">"{city}"</span>
+              {results.length} empresas processadas para <span className="font-bold text-foreground">"{niche}"</span> em <span className="font-bold text-foreground">"{city}"</span>
             </p>
-            <Button variant="outline" size="sm" onClick={() => navigate("/leads")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/leads")} className="w-full sm:w-auto">
               Ver todos na lista de Leads
             </Button>
           </div>
           {results.slice(0, 10).map((r, i) => (
-            <div key={i} className="glass-card rounded-xl p-4 flex items-center justify-between hover:shadow-lg transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+            <div key={i} className="glass-card rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-lg transition-shadow border border-border/50">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium text-foreground">{r.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Score: <span className="text-primary font-bold">{r.score}</span> ·
-                    {r.rating && <span className="ml-2">⭐ {r.rating}</span>}
-                    {r.user_ratings_total && <span className="ml-1">({r.user_ratings_total})</span>}
-                    {r.phone && <span className="ml-2">📞 {r.phone}</span>}
+                  <p className="font-bold text-foreground leading-tight">{r.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>Score: <span className="text-primary font-bold">{r.score}</span></span>
+                    {r.rating && <span className="flex items-center gap-0.5">⭐ {r.rating}</span>}
+                    {r.user_ratings_total && <span>({r.user_ratings_total})</span>}
                   </p>
+                  {r.phone && <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-mono">
+                    <Phone className="h-3 w-3" /> {r.phone}
+                  </p>}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 sm:justify-end ml-14 sm:ml-0">
                 {!r.website ? (
-                  <span className="text-xs font-medium text-destructive bg-destructive/10 px-2 py-1 rounded-full">Oportunidade: Sem site</span>
+                  <Badge variant="destructive" className="bg-destructive/10 text-destructive text-[10px] font-bold py-0.5 border-destructive/20 uppercase tracking-tighter">Oportunidade: Sem site</Badge>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Qualificado</span>
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Qualificado</Badge>
                 )}
               </div>
             </div>
           ))}
           {results.length > 10 && (
-            <p className="text-center text-xs text-muted-foreground pt-4">...e mais {results.length - 10} leads processados.</p>
+            <p className="text-center text-xs text-muted-foreground pt-4 font-medium italic">...e mais {results.length - 10} leads processados com sucesso.</p>
           )}
         </div>
       )}

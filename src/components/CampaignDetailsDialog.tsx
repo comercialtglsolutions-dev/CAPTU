@@ -99,7 +99,7 @@ export function CampaignDetailsDialog({ campaign, open, onOpenChange }: Campaign
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+            <DialogContent className="max-w-3xl w-[calc(100%-2rem)] h-[85vh] flex flex-col rounded-2xl md:rounded-xl">
                 <DialogHeader>
                     <DialogTitle className="text-xl">{campaign.name}</DialogTitle>
                 </DialogHeader>

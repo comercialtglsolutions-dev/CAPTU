@@ -188,24 +188,24 @@ export default function ContactsPage() {
         description="Gerencie suas oportunidades e acompanhe o progresso de cada negociação."
       />
 
-      <div className="flex-1 pb-4">
+      <div className="flex-1 pb-4 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-full">
+          <div className="flex gap-4 h-full overflow-x-auto pb-4 px-1 snap-x snap-mandatory md:snap-none md:overflow-visible custom-scrollbar">
             {FUNNEL_STAGES.map((stage) => {
               const stageLeads = getLeadsByStage(stage.id);
               return (
-                <div key={stage.id} className="flex flex-col flex-1 min-w-0">
+                <div key={stage.id} className="flex flex-col flex-none w-[85vw] md:w-auto md:flex-1 min-w-0 snap-center md:snap-align-none first:ml-4 last:mr-4 md:ml-0 md:mr-0">
                   {/* Column Header */}
-                  <div className={`p-3 rounded-t-xl border-b flex items-center justify-between mb-2 bg-card shadow-sm border-border/50`}>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${stage.headerColor}`}>
+                  <div className={`p-4 rounded-t-xl border-b flex items-center justify-between mb-2 bg-card shadow-sm border-border/50`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm ${stage.headerColor}`}>
                         {stage.icon}
                       </div>
-                      <h3 className="font-semibold text-foreground text-sm">
+                      <h3 className="font-bold text-foreground text-sm uppercase tracking-tight">
                         {stage.label}
                       </h3>
                     </div>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${stage.headerColor}`}>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ring-1 ring-inset ${stage.headerColor} min-w-[24px] text-center`}>
                       {stageLeads.length}
                     </span>
                   </div>

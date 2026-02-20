@@ -138,6 +138,72 @@
   .sidebar-gradient {
     background: var(--gradient-sidebar);
   }
+
+  /* Mobile refinements - Advanced Professional Polish */
+  @media (max-width: 640px) {
+    :root {
+      font-size: 13px;
+      /* Slightly smaller base */
+    }
+
+    /* Global Icon Scaling */
+    .lucide {
+      width: 1.15em !important;
+      height: 1.15em !important;
+      stroke-width: 2px;
+    }
+
+    /* Button Professionalization */
+    button:not(.h-16):not(.h-12) {
+      @apply h-9 px-3 text-xs font-semibold tracking-tight !important;
+    }
+
+    /* Card Padding Refinement */
+    .glass-card,
+    .bg-card {
+      @apply p-4 !important;
+    }
+
+    /* Metric/Data card icons */
+    .h-10.w-10.bg-accent {
+      @apply h-8 w-8 !important;
+    }
+
+    .h-12.w-12.bg-primary\/20 {
+      @apply h-10 w-10 !important;
+    }
+
+    /* Responsive Inputs */
+    input,
+    select,
+    textarea {
+      @apply text-sm !important;
+    }
+
+    /* Visual feedback */
+    button,
+    .badge,
+    .glass-card {
+      @apply transition-all active:scale-[0.97] active:opacity-90;
+    }
+
+    /* Heading refinement */
+    h1 {
+      @apply text-xl !important;
+    }
+
+    h2 {
+      @apply text-lg !important;
+    }
+
+    h3 {
+      @apply text-base !important;
+    }
+
+    h4 {
+      @apply text-sm !important;
+    }
+  }
 }
 
 /* Custom Google Maps InfoWindow styles - Premium Reset */

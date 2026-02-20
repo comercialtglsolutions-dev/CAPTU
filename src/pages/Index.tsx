@@ -11,6 +11,8 @@ import { ptBR } from "date-fns/locale";
 import LeadMap from "@/components/LeadMap";
 import { LeadDetailsDialog } from "@/components/LeadDetailsDialog";
 import { useState } from "react";
+import { MapPin, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface Lead {
   id: string;
@@ -145,7 +147,7 @@ export default function Dashboard() {
       <PageHeader title="Dashboard" description="Visão geral da sua prospecção B2B em tempo real" />
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-8">
         <MetricCard
           icon={Target}
           title="Leads coletados"
@@ -192,63 +194,67 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Funnel Chart */}
-        <div className="glass-card rounded-xl p-6">
+        <div className="glass-card rounded-xl p-4 md:p-6">
           <h3 className="text-sm font-semibold text-foreground mb-4">Funil de Conversão (Últimas 4 Semanas)</h3>
           {totalLeads > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={funnelData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Bar dataKey="leads" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} name="Leads" />
-                <Bar dataKey="qualificados" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Qualificados" />
-                <Bar dataKey="contatados" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} name="Contatados" />
-                <Bar dataKey="fechados" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} name="Fechados" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="h-[220px] md:h-[260px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={funnelData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Bar dataKey="leads" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} name="Leads" />
+                  <Bar dataKey="qualificados" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Qualificados" />
+                  <Bar dataKey="contatados" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} name="Contatados" />
+                  <Bar dataKey="fechados" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} name="Fechados" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
+            <div className="flex items-center justify-center h-[220px] md:h-[260px] text-muted-foreground text-sm">
               Colete leads para visualizar o funil
             </div>
           )}
         </div>
 
         {/* Trend */}
-        <div className="glass-card rounded-xl p-6">
+        <div className="glass-card rounded-xl p-4 md:p-6">
           <h3 className="text-sm font-semibold text-foreground mb-4">Leads Contatados (Últimos 6 Meses)</h3>
           {contactedLeads > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <defs>
-                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="valor" stroke="hsl(var(--primary))" fill="url(#colorVal)" strokeWidth={2} name="Contatados" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-[220px] md:h-[260px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <defs>
+                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="valor" stroke="hsl(var(--primary))" fill="url(#colorVal)" strokeWidth={2} name="Contatados" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
+            <div className="flex items-center justify-center h-[220px] md:h-[260px] text-muted-foreground text-sm">
               Inicie contatos para visualizar a tendência
             </div>
           )}
@@ -257,43 +263,87 @@ export default function Dashboard() {
 
       {/* Map View */}
       <div className="mb-8">
-        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          Localização dos Leads Coletados
-          {leads?.filter(l => l.latitude && l.longitude).length === 0 && (
-            <span className="text-[10px] font-normal text-muted-foreground">(Nenhum lead com coordenada exata ainda)</span>
-          )}
+        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            Localização dos Leads
+            {leads?.filter(l => l.latitude && l.longitude).length === 0 && (
+              <span className="text-[10px] font-normal text-muted-foreground">(Nenhum com coordenada)</span>
+            )}
+          </div>
         </h3>
-        <LeadMap leads={leads || []} apiKey={mapsApiKey} onViewDetails={handleViewDetails} />
+        <div className="rounded-xl overflow-hidden border border-border shadow-sm">
+          <LeadMap leads={leads || []} apiKey={mapsApiKey} onViewDetails={handleViewDetails} />
+        </div>
       </div>
 
       {/* Recent Leads */}
-      <div className="glass-card rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Leads Recentes</h3>
+      <div className="glass-card rounded-xl overflow-hidden">
+        <div className="p-4 md:p-6 border-b border-border/50 bg-muted/20">
+          <h3 className="text-sm font-semibold text-foreground">Leads Recentes</h3>
+        </div>
         {recentLeads.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Empresa</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cidade</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Segmento</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentLeads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-2 font-medium text-foreground">{lead.name}</td>
-                    <td className="py-3 px-2 text-muted-foreground">{lead.city}, {lead.state}</td>
-                    <td className="py-3 px-2 text-muted-foreground">{lead.segment || "N/A"}</td>
-                    <td className="py-3 px-2"><ScoreBadge score={lead.score} /></td>
-                    <td className="py-3 px-2"><StatusBadge status={lead.status as any} /></td>
+          <>
+            {/* Desktop View - Table restored */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/10">
+                    <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Empresa</th>
+                    <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cidade</th>
+                    <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Segmento</th>
+                    <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
+                    <th className="text-left py-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentLeads.map((lead) => (
+                    <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => handleViewDetails(lead)}>
+                      <td className="py-4 px-4 font-medium text-foreground">{lead.name}</td>
+                      <td className="py-4 px-4 text-muted-foreground">{lead.city}, {lead.state}</td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px] font-normal border-primary/20 bg-primary/5 text-primary">
+                          {lead.segment || "Sem segmento"}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4"><ScoreBadge score={lead.score} /></td>
+                      <td className="py-4 px-4"><StatusBadge status={lead.status as any} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View - Cards with Border and Shadow */}
+            <div className="md:hidden flex flex-col p-4 space-y-3">
+              {recentLeads.map((lead) => (
+                <div
+                  key={lead.id}
+                  className="bg-card rounded-xl border border-border/50 shadow-sm py-5 px-4 flex flex-col gap-2.5 active:bg-muted/50 transition-all active:scale-[0.98]"
+                  onClick={() => handleViewDetails(lead)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-foreground leading-tight truncate">{lead.name}</h4>
+                        <StatusBadge status={lead.status as any} />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-none mt-1">{lead.segment || "Sem segmento"}</p>
+                    </div>
+                    <ScoreBadge score={lead.score} />
+                  </div>
+                  <div className="flex items-center justify-between mt-[-8px]">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground opacity-80">
+                      <MapPin className="h-3 w-3" />
+                      {lead.city}, {lead.state}
+                    </div>
+                    <button className="text-xs font-medium text-primary flex items-center gap-1">
+                      Ver detalhes <ChevronRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
             Nenhum lead coletado ainda. Vá para a página de Leads para começar!
