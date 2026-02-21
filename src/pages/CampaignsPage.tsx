@@ -373,7 +373,6 @@ export default function CampaignsPage() {
                   </td>
                   <td className="py-4 px-4">
                     <p className="font-semibold text-foreground">{campaign.name}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{campaign.niche || "Sem nicho definido"}</p>
                   </td>
                   <td className="py-4 px-4 text-center">
                     <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(campaign.status)}`}>

@@ -267,12 +267,12 @@ export default function LeadMap({ leads, apiKey, onViewDetails }: LeadMapProps) 
                                 <div className="flex items-center justify-between pt-1 gap-4">
                                     <div className="flex items-center gap-2">
                                         {selectedLead.phone && (
-                                            <a href={`tel:${selectedLead.phone}`} className="p-2 rounded-full bg-slate-100 hover:bg-primary/10 hover:text-primary transition-all active:scale-90" title="Ligar">
+                                            <a href={`tel:${selectedLead.phone}`} className="p-2 rounded-full bg-slate-100 text-slate-700 hover:bg-primary/10 hover:text-primary transition-all active:scale-90" title="Ligar">
                                                 <Phone className="h-4 w-4" />
                                             </a>
                                         )}
                                         {selectedLead.website && (
-                                            <a href={selectedLead.website} target="_blank" rel="noreferrer" className="p-2 rounded-full bg-slate-100 hover:bg-primary/10 hover:text-primary transition-all active:scale-90" title="Ver Site">
+                                            <a href={selectedLead.website} target="_blank" rel="noreferrer" className="p-2 rounded-full bg-slate-100 text-slate-700 hover:bg-primary/10 hover:text-primary transition-all active:scale-90" title="Ver Site">
                                                 <Globe className="h-4 w-4" />
                                             </a>
                                         )}

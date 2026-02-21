@@ -13,6 +13,7 @@ import SearchPage from "./pages/SearchPage";
 import LeadsPage from "./pages/LeadsPage";
 import CampaignsPage from "./pages/CampaignsPage";
 import ContactsPage from "./pages/ContactsPage";
+import ChatPage from "@/pages/ChatPage";
 import MetricsPage from "./pages/MetricsPage";
 import AutomationsPage from "./pages/AutomationsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -81,6 +82,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <ContactsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ChatPage />
                   </AppLayout>
                 </ProtectedRoute>
               }

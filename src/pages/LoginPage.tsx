@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,10 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { theme } = useTheme();
+
+    const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const logoSrc = isDark ? "/captu.png" : "/captu.png";
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -89,9 +94,9 @@ export default function LoginPage() {
                     {/* Logo */}
                     <div className="flex justify-start mb-0 mt-10 mr-20">
                         <img
-                            src="/captu.png"
+                            src={logoSrc}
                             alt="CAPTU Logo"
-                            className="h-16 w-200"
+                            className="h-16 w-auto"
                         />
                     </div>
 

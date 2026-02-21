@@ -44,7 +44,8 @@ const navItems = [
   { to: "/search", icon: Search, label: "Buscar" },
   { to: "/leads", icon: Users, label: "Leads" },
   { to: "/campaigns", icon: Megaphone, label: "Campanhas" },
-  { to: "/contacts", icon: MessageSquare, label: "Contatos" },
+  { to: "/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/contacts", icon: Users, label: "Pipeline" },
   { to: "/metrics", icon: BarChart3, label: "Métricas" },
   { to: "/automations", icon: Zap, label: "Automações" },
 ];
@@ -61,6 +62,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isPipeline = location.pathname === "/contacts";
+
+  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const logoSrc = isDark ? "/captu-white.png" : "/captu.png";
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -100,13 +105,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-16 items-center border-b border-sidebar-border px-4 overflow-hidden">
           <Link to="/" className="flex items-center gap-2 overflow-hidden">
             <img
-              src={collapsed ? "/captu-collapsed.jpg" : "/captu.png"}
+              src={collapsed ? "/captu-collapsed.png" : logoSrc}
               alt="CAPTU Logo"
               className={cn(
                 "h-50 w-auto transition-all duration-300",
-                collapsed ? "min-w-[70px] ml-[-18px]" : "min-w-[120px]"
+                collapsed ? "min-w-[16px]" : "min-w-[120px]"
               )}
-              style={{ filter: "brightness(1.1)" }}
             />
           </Link>
         </div>
@@ -196,24 +200,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
-        <header className="lg:hidden flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 shrink-0 relative">
-          <div className="w-10" /> {/* Spacer */}
+        <header className="lg:hidden flex h-20 items-center justify-between border-b border-sidebar-border bg-sidebar px-6 shrink-0 relative">
+          <div className="w-12" /> {/* Spacer */}
           <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <img src="/captu.png" alt="CAPTU Logo" className="h-8 w-auto" style={{ filter: "brightness(1.1)" }} />
+            <img src={logoSrc} alt="CAPTU Logo" className="h-11 w-auto" />
           </Link>
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <button className="flex h-10 w-10 items-center justify-center rounded-md border border-sidebar-border text-sidebar-foreground">
-                <Menu className="h-6 w-6" />
+              <button className="flex h-12 w-12 items-center justify-center rounded-xl border border-sidebar-border text-sidebar-foreground bg-background/50 shadow-sm transition-transform active:scale-90">
+                <Menu className="h-7 w-7" />
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] p-0 border-r-sidebar-border bg-sidebar">
-              <SheetHeader className="h-16 border-b border-sidebar-border px-4 flex-row items-center justify-between space-y-0">
+              <SheetHeader className="h-20 border-b border-sidebar-border px-6 flex-row items-center justify-between space-y-0">
                 <SheetTitle className="text-left">
-                  <img src="/captu.png" alt="CAPTU Logo" className="h-6 w-auto" style={{ filter: "brightness(1.1)" }} />
+                  <img src={logoSrc} alt="CAPTU Logo" className="h-12 w-auto" />
                 </SheetTitle>
               </SheetHeader>
-              <div className="flex flex-col h-[calc(100vh-64px)]">
+              <div className="flex flex-col h-[calc(100vh-80px)]">
                 <nav className="flex-1 space-y-1 px-2 py-4">
                   {navItems.map((item) => {
                     const active = location.pathname === item.to;
@@ -284,8 +288,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main */}
-        <main className="flex-1 overflow-auto bg-background">
-          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">{children}</div>
+        <main className="flex-1 overflow-auto bg-background flex flex-col">
+          <div className={cn(
+            "flex-1 flex flex-col mx-auto w-full",
+            location.pathname === "/chat" ? "max-w-full p-0 overflow-hidden" : (isPipeline ? "max-w-full p-4 md:p-6 lg:p-8" : "max-w-7xl p-4 md:p-6 lg:p-8")
+          )}>
+            {children}
+          </div>
         </main>
       </div>
 

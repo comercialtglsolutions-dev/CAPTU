@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,10 @@ export default function ForgotPasswordPage() {
     const [loading, setLoading] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
     const { toast } = useToast();
+    const { theme } = useTheme();
+
+    const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const logoSrc = isDark ? "/captu-white.png" : "/captu.png";
 
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,7 +51,7 @@ export default function ForgotPasswordPage() {
                 {/* Logo */}
                 <div className="flex justify-center mb-8">
                     <img
-                        src="/captu.png"
+                        src={logoSrc}
                         alt="CAPTU Logo"
                         className="h-16 w-auto"
                     />

@@ -53,12 +53,16 @@ export const searchLeads = async (query: string, city: string, filters: SearchFi
                     const detailsResponse = await axios.get(`https://maps.googleapis.com/maps/api/place/details/json`, {
                         params: {
                             place_id: place.place_id,
-                            fields: 'name,formatted_phone_number,website,rating,user_ratings_total,types,address_components,formatted_address',
+                            fields: 'name,formatted_phone_number,website,rating,user_ratings_total,types,address_components,formatted_address,photos',
                             key: GOOGLE_PLACES_API_KEY
                         }
                     });
 
                     const details = detailsResponse.data.result || place;
+                    const photoReference = details.photos?.[0]?.photo_reference;
+                    const imageUrl = photoReference
+                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photoReference}&key=${GOOGLE_PLACES_API_KEY}`
+                        : null;
 
                     // Extrai cidade e estado reais do Google
                     let cityFromGoogle = '';
@@ -89,7 +93,8 @@ export const searchLeads = async (query: string, city: string, filters: SearchFi
                         rating: details.rating || place.rating,
                         user_ratings_total: details.user_ratings_total || place.user_ratings_total,
                         phone: details.formatted_phone_number || place.formatted_phone_number,
-                        segment: query
+                        segment: query,
+                        image_url: imageUrl
                     };
 
                     const location = place.geometry?.location;

@@ -190,11 +190,11 @@ export default function ContactsPage() {
 
       <div className="flex-1 pb-4 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-full overflow-x-auto pb-4 px-1 snap-x snap-mandatory md:snap-none md:overflow-visible custom-scrollbar">
+          <div className="flex gap-4 h-full overflow-x-auto pb-4 px-1 snap-x snap-mandatory md:snap-none md:overflow-x-auto custom-scrollbar">
             {FUNNEL_STAGES.map((stage) => {
               const stageLeads = getLeadsByStage(stage.id);
               return (
-                <div key={stage.id} className="flex flex-col flex-none w-[85vw] md:w-auto md:flex-1 min-w-0 snap-center md:snap-align-none first:ml-4 last:mr-4 md:ml-0 md:mr-0">
+                <div key={stage.id} className="flex flex-col flex-none w-[85vw] md:w-auto md:flex-1 md:min-w-[260px] snap-center md:snap-align-none first:ml-4 last:mr-4 md:ml-0 md:mr-0">
                   {/* Column Header */}
                   <div className={`p-4 rounded-t-xl border-b flex items-center justify-between mb-2 bg-card shadow-sm border-border/50`}>
                     <div className="flex items-center gap-3">
@@ -284,18 +284,20 @@ export default function ContactsPage() {
                                   {/* Info Chips */}
                                   <div className="flex flex-wrap gap-2 mb-3">
                                     <ScoreBadge score={lead.score} />
-                                    {lead.rating && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                                        ⭐ {lead.rating}
-                                      </span>
-                                    )}
                                   </div>
 
                                   {/* Footer Info */}
                                   <div className="space-y-1.5 pt-2 border-t border-border/40">
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      <MapPin className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{lead.city}, {lead.state}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                                        <MapPin className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{lead.city}, {lead.state}</span>
+                                      </div>
+                                      {lead.rating && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                                          ⭐ {lead.rating}
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
                                       <span className="text-[10px]">Atualizado em {

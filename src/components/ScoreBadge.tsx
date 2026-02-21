@@ -2,11 +2,12 @@ import { cn } from "@/lib/utils";
 
 interface ScoreBadgeProps {
   score: number;
+  className?: string;
 }
 
-export default function ScoreBadge({ score }: ScoreBadgeProps) {
+export default function ScoreBadge({ score, className }: ScoreBadgeProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn("flex items-center gap-2", className)}>
       <div className="h-2 w-16 rounded-full bg-muted overflow-hidden">
         <div
           className={cn(

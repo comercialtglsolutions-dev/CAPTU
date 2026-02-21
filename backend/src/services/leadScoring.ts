@@ -6,6 +6,7 @@ export interface LeadData {
     user_ratings_total?: number;
     phone?: string;
     segment?: string;
+    image_url?: string | null;
 }
 
 export const calculateScore = (lead: LeadData): number => {

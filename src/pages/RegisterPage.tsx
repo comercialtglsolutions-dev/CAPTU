@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,10 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { theme } = useTheme();
+
+    const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const logoSrc = isDark ? "/captu-white.png" : "/captu.png";
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -132,7 +137,7 @@ export default function RegisterPage() {
                     {/* Logo */}
                     <div className="flex justify-start mb-8">
                         <img
-                            src="/captu.png"
+                            src={logoSrc}
                             alt="CAPTU Logo"
                             className="h-12 w-auto"
                         />

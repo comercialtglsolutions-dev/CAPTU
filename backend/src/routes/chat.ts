@@ -65,6 +65,29 @@ router.post('/webhook', async (req, res) => {
     console.log(`[Webhook] Evento recebido: ${event.event} de ${event.data?.key?.remoteJid}`);
 
     try {
+        // Lógica de Presença Realtime (Broadcast)
+        if (event.event === 'presence.update') {
+            const presenceData = event.data;
+            const phone = presenceData.id.split('@')[0];
+            const presence = presenceData.presences[presenceData.id]?.lastKnownPresence || 'unavailable';
+
+            console.log(`[Presence] ${phone} está ${presence}`);
+
+            // Criar canal de broadcast para notificar o frontend sem tocar no banco
+            const channel = supabase.channel('presence-global');
+            channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'presence-status',
+                        payload: { phone, presence, timestamp: new Date().toISOString() },
+                    });
+                    // Desinscrever após o envio para não manter conexões abertas no backend (stateless)
+                    supabase.removeChannel(channel);
+                }
+            });
+        }
+
         // Filtramos apenas por mensagens recebidas (upsert)
         if (event.event === 'messages.upsert' && !event.data.key.fromMe) {
             const messageData = event.data;

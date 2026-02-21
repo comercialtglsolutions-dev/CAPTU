@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Info, MapPin, Phone, Mail, Globe, Star, Calendar, Send, Loader2 } from "lucide-react";
+import { Building2, Info, MapPin, Phone, Mail, Globe, Star, Calendar, Send, Loader2, MessageSquare } from "lucide-react";
 import ScoreBadge from "@/components/ScoreBadge";
 import { LeadHistory } from "@/components/LeadHistory";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ interface LeadDetailsDialogProps {
 
 export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialogProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const mutation = useMutation({
     mutationFn: async (leadId: string) => {
@@ -205,6 +207,18 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" className="font-semibold text-xs" onClick={() => onOpenChange(false)}>Fechar</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-bold text-xs border-primary/20 hover:bg-primary/5 text-primary"
+              onClick={() => {
+                onOpenChange(false);
+                navigate("/chat");
+              }}
+            >
+              <MessageSquare className="h-3 w-3 mr-2" />
+              Ver no Chat
+            </Button>
             <Button
               size="sm"
               className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 px-4 text-xs"
