@@ -23,6 +23,10 @@
         {
           "key": "Access-Control-Allow-Headers",
           "value": "Content-Type,Authorization,x-api-key,apikey"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://captu.vercel.app"
         }
       ]
     }

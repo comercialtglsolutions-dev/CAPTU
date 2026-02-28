@@ -1,0 +1,264 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "8c44a269-5c00-4e08-85e4-345cc9ca0a24",
+      "name": "Cron (1 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://captu-jqjg.vercel.app/api/campaigns/active-tasks",
+        "options": {}
+      },
+      "id": "5055bb47-b57f-4905-9f3a-47b9386c1ecf",
+      "name": "Get Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -896,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "0fbc0298-e944-4c2d-a6f8-443f42a7a6f4",
+      "name": "Iterar Leads",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = 'http://host.docker.internal:8080/message/sendText/CaptuComercial';\nconst lead = $node[\"Iterar Leads\"].json;\n\nlet result = { success: false, status: 0 };\n\ntry {\n  const response = await fetch(url, {\n    method: 'POST',\n    headers: {\n      'apikey': '54CC09C92EA6-4656-9C16-9E89179B4793',\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({\n      number: lead.phone,\n      text: lead.message,\n      linkPreview: false\n    })\n  });\n  \n  const data = await response.json();\n  result = {\n    status: response.status,\n    response: data,\n    success: response.status >= 200 && response.status < 300\n  };\n} catch (err) {\n  result = {\n    status: 500,\n    error: err.message,\n    success: false\n  };\n}\n\nreturn [{ json: result }];"
+      },
+      "id": "fe269bf3-b184-4bb4-b289-aa3576defe01",
+      "name": "Evolution API (Código)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $node[\"Evolution API (Código)\"].json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "e9de947a-8c90-4945-9c6c-5cb9ddd0c90d",
+      "name": "Deu Certo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://captu-jqjg.vercel.app/api/campaigns/{{ $node[\"Iterar Leads\"].json[\"campaign_id\"] }}/track-send",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lead_id",
+              "value": "={{ $node[\"Iterar Leads\"].json[\"lead_id\"] }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $node[\"Iterar Leads\"].json[\"message\"] }}"
+            },
+            {
+              "name": "status",
+              "value": "sent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d28dada9-f02a-4465-a0ab-fe043cf5a1eb",
+      "name": "Track OK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        256,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://captu-jqjg.vercel.app/api/campaigns/{{ $node[\"Iterar Leads\"].json[\"campaign_id\"] }}/track-send",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lead_id",
+              "value": "={{ $node[\"Iterar Leads\"].json[\"lead_id\"] }}"
+            },
+            {
+              "name": "message",
+              "value": "NÚMERO INVÁLIDO"
+            },
+            {
+              "name": "status",
+              "value": "error"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e4403a9-926f-4d1a-9b72-cab8bc53e0ce",
+      "name": "Track Erro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        256,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "id": "4a098cb7-497b-41b8-90ce-8e77a48c473a",
+      "name": "Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        1056
+      ],
+      "webhookId": "b95182a6-4f47-4982-8710-6987acdee207"
+    }
+  ],
+  "connections": {
+    "Cron (1 min)": {
+      "main": [
+        [
+          {
+            "node": "Get Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tasks": {
+      "main": [
+        [
+          {
+            "node": "Iterar Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Iterar Leads": {
+      "main": [
+        [
+          {
+            "node": "Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API (Código)": {
+      "main": [
+        [
+          {
+            "node": "Deu Certo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deu Certo?": {
+      "main": [
+        [
+          {
+            "node": "Track Erro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Track OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track OK": {
+      "main": [
+        [
+          {
+            "node": "Iterar Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Erro": {
+      "main": [
+        [
+          {
+            "node": "Iterar Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delay": {
+      "main": [
+        [
+          {
+            "node": "Evolution API (Código)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "519ffe1f415c2ca54b8345eabc9d994a8beee554c13a13f9c2f163e8efe28d73"
+  }
+}

@@ -89,7 +89,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "http://host.docker.internal:8080/message/sendText/CaptuComercial",
+                "url": "https://captu-jqjg.vercel.app/message/sendText/CaptuComercial",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [
