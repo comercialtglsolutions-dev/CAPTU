@@ -141,6 +141,9 @@ router.post('/:id/send-to-n8n', async (req, res) => {
     const { id } = req.params;
 
     try {
+        if (!supabase) {
+            return res.status(500).json({ error: 'Supabase client not initialized. Check Env Vars.' });
+        }
         // 1. Busca dados completos do lead
         const { data: lead, error: fetchError } = await supabase
             .from('leads')

@@ -89,7 +89,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "https://captu-jqjg.vercel.app/message/sendText/CaptuComercial",
+                "url": "http://IP_DA_SUA_API:8080/message/sendText/CaptuComercial",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [

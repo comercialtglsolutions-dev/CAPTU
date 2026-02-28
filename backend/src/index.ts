@@ -40,43 +40,27 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
-// Lista de origens permitidas. Em produção, qualquer *.vercel.app também é
-// aceito para suportar previews de deploy automáticos.
 const allowedOrigins = [
-    'https://captu.vercel.app',        // Frontend principal em produção
-    'https://captu-jqjg.vercel.app',   // Backend em produção (acesso direto/testes)
-    'http://localhost:5173',            // Vite dev (porta padrão)
-    'http://localhost:8081',            // Vite dev (porta configurada em vite.config.ts)
-    'http://localhost:3000',            // Backend Express local
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:8081',
+    'https://captu.vercel.app',
+    'https://captu-jqjg.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:8081',
+    'http://localhost:3000',
     'https://n8n.tglsolutions.com.br',
 ];
 
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
-        // Permite requisições sem origin: curl, Postman, n8n (server-to-server), etc.
         if (!origin) return callback(null, true);
-
-        // Origem exata na lista de permitidos
         if (allowedOrigins.includes(origin)) return callback(null, true);
-
-        // Qualquer preview/produção da Vercel (ex: captu-git-main-user.vercel.app)
-        if (/\.vercel\.app$/.test(origin)) return callback(null, true);
-
-        // Bloqueia tudo o mais
-        console.warn(`[CORS] Bloqueado → ${origin}`);
-        callback(new Error(`CORS policy: origem não permitida → ${origin}`));
+        if (origin.endsWith('.vercel.app')) return callback(null, true);
+        callback(null, true); // Fallback mais permissivo para debug
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey'],
     credentials: true,
-    optionsSuccessStatus: 204,
 };
 
-// Pré-flight OPTIONS — deve vir antes de app.use(cors()) para cobrir todas as rotas
-// Express 5 usa path-to-regexp v8: wildcard agora é '/{*path}' em vez de '*'
-app.options('/{*path}', cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
