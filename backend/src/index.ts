@@ -50,6 +50,7 @@ const allowedOrigins = [
     'http://localhost:3000',            // Backend Express local
     'http://127.0.0.1:5173',
     'http://127.0.0.1:8081',
+    'https://n8n.tglsolutions.com.br',
 ];
 
 const corsOptions: cors.CorsOptions = {

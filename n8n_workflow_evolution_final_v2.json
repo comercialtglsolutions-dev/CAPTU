@@ -19,7 +19,7 @@
         },
         {
             "parameters": {
-                "url": "=http://host.docker.internal:3000/api/leads/{{$json.body.lead.id}}",
+                "url": "=https://captu-jqjg.vercel.app/api/leads/{{$json.body.lead.id}}",
                 "options": {}
             },
             "id": "ccbdf9eb-1c63-46e1-aac3-67bfd23fd8d5",
@@ -126,7 +126,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "=http://host.docker.internal:3000/api/leads/{{$('Buscar Lead Backend').item.json.id}}/history",
+                "url": "=https://captu-jqjg.vercel.app/api/leads/{{$('Buscar Lead Backend').item.json.id}}/history",
                 "sendBody": true,
                 "bodyParameters": {
                     "parameters": [
