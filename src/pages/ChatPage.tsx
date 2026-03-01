@@ -144,7 +144,9 @@ export default function ChatPage() {
 
     // ─── Conexão Socket.IO ──────────────────────────────────────────────────
     useEffect(() => {
-        const socket = io(API_URL);
+        const socket = io(API_URL, {
+            transports: ['websocket']
+        });
         
         // Cache local temporário para a sessão garantir o mapeamento
         const localLidMap: Record<string, string> = {};

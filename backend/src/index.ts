@@ -41,9 +41,10 @@ const port = process.env.PORT || 3000;
 // ─── Socket.io ───────────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
     cors: {
-        origin: '*', // Ajuste para produção se necessário
+        origin: '*',
         methods: ['GET', 'POST']
-    }
+    },
+    transports: ['websocket'] // Força apenas WebSockets
 });
 
 const whatsapp = WhatsAppService.getInstance();
