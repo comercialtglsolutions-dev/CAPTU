@@ -17,7 +17,19 @@ const whatsapp = WhatsAppService.getInstance();
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const corsOptions: cors.CorsOptions = {
-    origin: true,
+    origin: (origin, callback) => {
+        // Permitir Vercel, Localhost e requisições sem origin (como mobile ou Postman)
+        const allowedOrigins = [
+            'https://captu.vercel.app',
+            'http://localhost:5173',
+            'http://localhost:3000'
+        ];
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey'],
     credentials: true,
