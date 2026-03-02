@@ -127,6 +127,11 @@ router.post('/disconnect', async (req, res) => {
     }
 });
 
+// GET /api/chat/status - Retorna o status atual e o QR code se houver
+router.get('/status', (req, res) => {
+    res.json(whatsapp.getStatus());
+});
+
 // GET /api/chat/profile-pic/:jid
 router.get('/profile-pic/:jid', async (req, res) => {
     try {

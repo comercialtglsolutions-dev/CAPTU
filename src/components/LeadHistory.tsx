@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { API_URL } from "@/config";
+import { WA_API_URL } from "@/config";
 
 interface HistoryItem {
     id: string;
@@ -97,7 +97,7 @@ export function LeadHistory({ leadId, phone }: { leadId: string, phone?: string 
 
         setIsSending(true);
         try {
-            const response = await fetch(`${API_URL}/api/chat/send`, {
+            const response = await fetch(`${WA_API_URL}/api/chat/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

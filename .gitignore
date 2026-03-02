@@ -15,6 +15,13 @@ dist-ssr
 Plataforma_Inteligente_Prospecao_B2B_TGL_Solutions.pdf
 n8n_workflow_evolution_final_v2.json
 
+# Backend specific
+backend/dist
+backend/node_modules
+*.proxy_cache.json
+whatsapp_proxy_cache.json
+.agent
+.gemini
 
 # Editor directories and files
 .vscode/*

@@ -1,95 +1,23 @@
 /**
  * CAPTU Backend - Entry Point
- *
- * Carregamento de variáveis de ambiente:
- *  - LOCAL : lê o arquivo .env na raiz do monorepo (../../.env relativo a este arquivo compilado)
- *  - VERCEL: as variáveis são injetadas pela plataforma automaticamente
- *
- * IMPORTANTE: o dotenv.config() DEVE acontecer antes de qualquer outro require/import
- * que consuma process.env. Como o TypeScript compila para CommonJS e os imports
- * são transformados em require() síncronos no topo, usamos um truque: o dotenv
- * é chamado via require() condicional antes que os demais módulos sejam carregados.
- * Isso funciona porque no CommonJS o require() é síncrono e respeitado na ordem.
  */
 
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-if (!process.env.VERCEL) {
-    const envPath = path.resolve(__dirname, '../../.env');
-    dotenv.config({ path: envPath });
-}
-
+import './env.js'; // MUST be first to load environment variables
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import leadRoutes from './routes/leads.js';
 import campaignRoutes from './routes/campaigns.js';
 import chatRoutes from './routes/chat.js';
 import { WhatsAppService } from './services/whatsapp.js';
 
 const app = express();
-const httpServer = createServer(app);
 const port = process.env.PORT || 3000;
 
-// ─── Socket.io ───────────────────────────────────────────────────────────────
-const io = new Server(httpServer, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    },
-    transports: ['websocket'] // Força apenas WebSockets
-});
-
 const whatsapp = WhatsAppService.getInstance();
-whatsapp.setIO(io);
-
-io.on('connection', (socket) => {
-    console.log(`\n[Navegador] Tela do Painel conectada (WebSocket ID: ${socket.id})`);
-    
-    // Obter status para log explícito
-    const status = whatsapp.getStatus();
-    if (status.isPaired) {
-        console.log(`[WhatsApp Status] ✅ CELULAR VINCULADO e ativo. Sincronizando tela...`);
-    } else {
-        console.log(`[WhatsApp Status] ❌ NENHUM CELULAR VINCULADO. Aguardando leitura do QR Code.`);
-    }
-    
-    // Enviar status atual ao conectar
-    socket.emit('whatsapp-connection-update', status);
-    
-    // Enviar histórico em cache se já existir (conecta quase instantâneo)
-    const history = whatsapp.getHistoryCache();
-    if (history && (history.chats.length > 0 || history.messages.length > 0)) {
-        socket.emit('whatsapp-history', history);
-    }
-
-    socket.on('disconnect', () => {
-        console.log(`[Navegador] Tela do Painel desconectada (WebSocket ID: ${socket.id})`);
-    });
-});
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-    'https://captu.vercel.app',
-    'https://captu-jqjg.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:8081',
-    'http://localhost:3000',
-    'https://n8n.tglsolutions.com.br',
-];
-
 const corsOptions: cors.CorsOptions = {
-    origin: (origin, callback) => {
-        // Liberal absoluto para teste de produção e debug
-        callback(null, true);
-    },
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey'],
     credentials: true,
@@ -108,35 +36,25 @@ app.use('/api/chat', chatRoutes);
 app.get('/', (_req, res) => {
     res.json({
         status: 'ok',
-        message: 'CAPTU Backend API is running',
-        environment: process.env.VERCEL ? 'vercel' : 'local',
+        message: 'CAPTU Backend API is operational',
+        engine: 'Express',
+        environment: process.env.VERCEL ? 'vercel-serverless' : 'persistent-active',
+        whatsapp_supported: !process.env.VERCEL,
         timestamp: new Date().toISOString(),
     });
 });
 
 // ─── Inicialização ────────────────────────────────────────────────────────────
-// No ambiente Vercel, precisamos garantir que o motor inicie ou responda
 if (process.env.VERCEL) {
-    console.log('[Vercel] ☁️ Rodando em ambiente Serverless');
-    whatsapp.initialize().catch(err => {
-        console.error('[WhatsApp] Falha ao inicializar motor na Vercel:', err);
-    });
+    console.log('[Vercel] ☁️ Rodando em ambiente Serverless (Somente API REST)');
 } else {
-    httpServer.listen(port, () => {
+    app.listen(port, () => {
         console.log(`\n🚀 Backend CAPTU rodando → http://localhost:${port}`);
         console.log('─'.repeat(50));
-        console.log(`   SUPABASE_URL          : ${process.env.SUPABASE_URL ? '✅' : '❌ FALTANDO'}`);
-        console.log(`   SUPABASE_SERVICE_KEY  : ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅' : '❌ FALTANDO'}`);
-        console.log(`   GEMINI_API_KEY        : ${process.env.GEMINI_API_KEY ? '✅' : '❌ FALTANDO'}`);
-        console.log('─'.repeat(50));
-
         whatsapp.initialize().catch(err => {
-            console.error('[WhatsApp] Falha ao inicializar motor nativo:', err);
+            console.error('[WhatsApp] Falha ao inicializar motor:', err);
         });
     });
 }
 
-// Export para Vercel Serverless Functions
-// Exportamos o httpServer para que o Socket.io funcione corretamente (evita 404)
-export default httpServer;
-
+export default app;

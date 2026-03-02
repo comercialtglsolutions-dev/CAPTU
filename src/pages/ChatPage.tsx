@@ -44,11 +44,11 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { API_URL } from "@/config";
+import { WA_API_URL } from "@/config";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { io } from "socket.io-client";
+import { supabase } from "@/integrations/supabase/client";
 import {
     Dialog,
     DialogContent,
@@ -133,6 +133,25 @@ export default function ChatPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
+        // Busca Status Inicial
+        const fetchInitialStatus = async () => {
+            try {
+                const res = await fetch(`${WA_API_URL}/api/chat/status`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.connection) setWaStatus(data.connection);
+                    if (data.qr) setWaQr(data.qr);
+                    if (data.isPaired !== undefined) setIsPaired(!!data.isPaired);
+                    if (data.connection === 'open') setIsSyncing(false);
+                }
+            } catch (e) {
+                console.error("Erro ao buscar status inicial:", e);
+            }
+        };
+        fetchInitialStatus();
+    }, []);
+
+    useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
         if (waStatus === 'open') {
             timeout = setTimeout(() => setIsSyncing(false), 8000);
@@ -142,205 +161,154 @@ export default function ChatPage() {
         return () => clearTimeout(timeout);
     }, [waStatus]);
 
-    // ─── Conexão Socket.IO ──────────────────────────────────────────────────
+    // ─── Conexão Realtime (Bypass Vercel WebSocket Block) ──────────────────
     useEffect(() => {
-        const socket = io(API_URL, {
-            transports: ['websocket']
-        });
-        
-        // Cache local temporário para a sessão garantir o mapeamento
+        const channel = supabase.channel('whatsapp-events');
         const localLidMap: Record<string, string> = {};
 
-        // 1. Atualizações de Conexão
-        socket.on('whatsapp-connection-update', ({ connection, qr, isPaired }) => {
-            setWaStatus(connection);
-            setWaQr(qr);
-            setIsPaired(!!isPaired);
+        channel
+            .on('broadcast', { event: 'connection-update' }, ({ payload }) => {
+                const { connection, qr, isPaired } = payload;
+                setWaStatus(connection);
+                setWaQr(qr);
+                setIsPaired(!!isPaired);
 
-            if (connection === 'close') {
-                // ESTRATÉGIA PROXY: Limpa TODOS os estados em memória ao desconectar!
-                // Assim as mensagens da conta anterior não vazam para a próxima.
-                setChats({});
-                setMessagesByChat({});
-                setContacts({});
-                setSelectedJid(null);
-                setIsSyncing(true);
-                // Limpar cache local do LID Map
-                for (const key in localLidMap) delete localLidMap[key];
-            }
-        });
+                if (connection === 'close') {
+                    setChats({});
+                    setMessagesByChat({});
+                    setContacts({});
+                    setSelectedJid(null);
+                    setIsSyncing(true);
+                    for (const key in localLidMap) delete localLidMap[key];
+                }
+            })
+            .on('broadcast', { event: 'history' }, ({ payload }) => {
+                const { chats: rawChats, messages: rawMessages, contacts: rawContacts } = payload;
+                
+                const contactsMap: Record<string, ProxyContact> = {};
+                if (rawContacts) {
+                    rawContacts.forEach((c: any) => {
+                        const id = c.id;
+                        const name = c.name || c.notify || c.verifiedName || id.split('@')[0];
+                        contactsMap[id] = { id, name, pushName: c.notify };
+                        if (c.lid) {
+                            localLidMap[c.lid] = id;
+                            contactsMap[c.lid] = { id, name, pushName: c.notify };
+                        }
+                    });
+                }
+                setContacts(prev => ({ ...prev, ...contactsMap }));
 
-        // 2. Histórico Inicial (Sincronização Web)
-        socket.on('whatsapp-history', ({ chats: rawChats, messages: rawMessages, contacts: rawContacts }) => {
-            // Processa Contatos e cria o Mapeamento LID -> JID
-            const contactsMap: Record<string, ProxyContact> = {};
-            if (rawContacts) {
-                rawContacts.forEach((c: any) => {
+                const messagesMap: Record<string, ProxyMessage[]> = {};
+                if (rawMessages) {
+                    rawMessages.forEach((msg: any) => {
+                        if (!msg.key || !msg.key.remoteJid) return;
+                        let jid = msg.key.remoteJid;
+                        jid = localLidMap[jid] || jid;
+                        const text = extractTextFromWhatsAppMessage(msg);
+                        if (!text) return;
+                        const proxyMsg: ProxyMessage = {
+                            id: msg.key.id,
+                            text: text,
+                            direction: msg.key.fromMe ? 'outbound' : 'inbound',
+                            timestamp: msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now(),
+                            status: 'delivered',
+                            sender: msg.key.participant || jid
+                        };
+                        if (!messagesMap[jid]) messagesMap[jid] = [];
+                        messagesMap[jid].push(proxyMsg);
+                    });
+                }
+                setMessagesByChat(prev => ({ ...prev, ...messagesMap }));
+
+                const chatsMap: Record<string, ProxyChat> = {};
+                if (rawChats) {
+                    rawChats.forEach((chat: any) => {
+                        let jid = chat.id;
+                        jid = localLidMap[jid] || jid;
+                        const type = jid.endsWith('@g.us') ? 'group' : jid.endsWith('@newsletter') ? 'community' : 'individual';
+                        const contactName = contactsMap[jid]?.name || chat.name || chat.verifiedName || jid.split('@')[0];
+                        const jidMsgs = messagesMap[jid];
+                        const lastMsgObj = jidMsgs && jidMsgs.length > 0 ? jidMsgs[jidMsgs.length - 1] : null;
+                        const lastText = lastMsgObj ? lastMsgObj.text : '';
+                        let lastMessageSender = '';
+                        if (type === 'group' && lastMsgObj && lastMsgObj.direction === 'inbound' && lastMsgObj.sender) {
+                            const senderContact = contactsMap[lastMsgObj.sender];
+                            lastMessageSender = senderContact?.pushName || senderContact?.name || lastMsgObj.sender.split('@')[0];
+                        }
+                        const lastTime = chat.conversationTimestamp ? (typeof chat.conversationTimestamp === 'object' ? Number(chat.conversationTimestamp.low || 0) * 1000 : Number(chat.conversationTimestamp) * 1000) : (lastMsgObj ? lastMsgObj.timestamp : 0);
+                        chatsMap[jid] = {
+                            id: jid,
+                            name: contactName,
+                            lastMessage: lastText,
+                            lastMessageSender: lastMessageSender,
+                            lastMessageTime: lastTime,
+                            pinned: chat.pinned ? Number(chat.pinned) : 0,
+                            unreadCount: chat.unreadCount || 0,
+                            type: type as any
+                        };
+                    });
+                }
+                setChats(prev => ({ ...prev, ...chatsMap }));
+                setIsSyncing(false);
+            })
+            .on('broadcast', { event: 'new-message' }, ({ payload: msg }) => {
+                if (!msg.key || !msg.key.remoteJid) return;
+                let jid = msg.key.remoteJid;
+                jid = localLidMap[jid] || jid;
+                const text = extractTextFromWhatsAppMessage(msg);
+                if (!text) return;
+                const isOutbound = msg.key.fromMe;
+                const timestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now();
+                const proxyMsg: ProxyMessage = {
+                    id: msg.key.id,
+                    text: text,
+                    direction: isOutbound ? 'outbound' : 'inbound',
+                    timestamp: timestamp,
+                    status: 'delivered',
+                    sender: msg.key.participant || jid
+                };
+                setMessagesByChat(prev => {
+                    const current = prev[jid] || [];
+                    if (current.find(m => m.id === proxyMsg.id)) return prev;
+                    return { ...prev, [jid]: [...current, proxyMsg] };
+                });
+                setChats(prev => {
+                    const existing = prev[jid];
+                    const type = jid.endsWith('@g.us') ? 'group' : 'individual';
+                    return {
+                        ...prev,
+                        [jid]: {
+                            id: jid,
+                            name: existing?.name || msg.pushName || jid.split('@')[0],
+                            lastMessage: text,
+                            lastMessageSender: existing?.lastMessageSender,
+                            lastMessageTime: timestamp,
+                            pinned: existing?.pinned || 0,
+                            unreadCount: isOutbound ? 0 : ((existing?.unreadCount || 0) + 1),
+                            type: existing?.type || type as any
+                        }
+                    };
+                });
+            })
+            .on('broadcast', { event: 'contacts-upsert' }, ({ payload: newContacts }) => {
+                const updates: Record<string, ProxyContact> = {};
+                newContacts.forEach((c: any) => {
                     const id = c.id;
-                    const name = c.name || c.notify || c.verifiedName || id.split('@')[0];
-                    contactsMap[id] = { id, name, pushName: c.notify };
-                    
+                    const name = c.name || c.notify;
+                    updates[id] = { id, name, pushName: c.notify };
                     if (c.lid) {
                         localLidMap[c.lid] = id;
-                        contactsMap[c.lid] = { id, name, pushName: c.notify };
+                        updates[c.lid] = { id, name, pushName: c.notify };
                     }
                 });
-            }
-            setContacts(prev => ({ ...prev, ...contactsMap }));
+                setContacts(prev => ({ ...prev, ...updates }));
+            })
+            .subscribe();
 
-            // Processa Mensagens
-            const messagesMap: Record<string, ProxyMessage[]> = {};
-            if (rawMessages) {
-                rawMessages.forEach((msg: any) => {
-                    if (!msg.key || !msg.key.remoteJid) return;
-                    let jid = msg.key.remoteJid;
-                    jid = localLidMap[jid] || jid; // Resolve LID para JID se aplicável
-
-                    const text = extractTextFromWhatsAppMessage(msg);
-                    if (!text) return;
-
-                    const proxyMsg: ProxyMessage = {
-                        id: msg.key.id,
-                        text: text,
-                        direction: msg.key.fromMe ? 'outbound' : 'inbound',
-                        timestamp: msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now(),
-                        status: 'delivered',
-                        sender: msg.key.participant || jid
-                    };
-
-                    if (!messagesMap[jid]) messagesMap[jid] = [];
-                    messagesMap[jid].push(proxyMsg);
-                });
-                
-                // Ordena histórico
-                Object.keys(messagesMap).forEach(jid => {
-                    messagesMap[jid].sort((a,b) => a.timestamp - b.timestamp);
-                });
-            }
-            setMessagesByChat(prev => ({ ...prev, ...messagesMap }));
-
-            // Processa Chats
-            const chatsMap: Record<string, ProxyChat> = {};
-            if (rawChats) {
-                rawChats.forEach((chat: any) => {
-                    let jid = chat.id;
-                    jid = localLidMap[jid] || jid; // Resolve LID para JID se aplicável
-                    
-                    const type = jid.endsWith('@g.us') ? 'group' : jid.endsWith('@newsletter') ? 'community' : 'individual';
-                    const contactName = contactsMap[jid]?.name || chat.name || chat.verifiedName || jid.split('@')[0];
-                    
-                    const jidMsgs = messagesMap[jid];
-                    const lastMsgObj = jidMsgs && jidMsgs.length > 0 ? jidMsgs[jidMsgs.length - 1] : null;
-                    const lastText = lastMsgObj ? lastMsgObj.text : '';
-                    
-                    let lastMessageSender = '';
-                    if (type === 'group' && lastMsgObj && lastMsgObj.direction === 'inbound' && lastMsgObj.sender) {
-                        const senderContact = contactsMap[lastMsgObj.sender];
-                        lastMessageSender = senderContact?.pushName || senderContact?.name || lastMsgObj.sender.split('@')[0];
-                    }
-
-                    const lastTime = chat.conversationTimestamp ? 
-                        (typeof chat.conversationTimestamp === 'object' ? Number(chat.conversationTimestamp.low || 0) * 1000 : Number(chat.conversationTimestamp) * 1000) : 
-                        (lastMsgObj ? lastMsgObj.timestamp : 0);
-                    
-                    chatsMap[jid] = {
-                        id: jid,
-                        name: contactName,
-                        lastMessage: lastText,
-                        lastMessageSender: lastMessageSender,
-                        lastMessageTime: lastTime,
-                        pinned: chat.pinned ? Number(chat.pinned) : 0,
-                        unreadCount: chat.unreadCount || 0,
-                        type: type as any
-                    };
-                });
-            }
-            setChats(prev => ({ ...prev, ...chatsMap }));
-            
-            setIsSyncing(false); // Recebeu a carga, encerra o loading!
-        });
-
-        // 3. Atualização de Contatos Dinâmicos
-        socket.on('whatsapp-contacts-upsert', (newContacts: any[]) => {
-            const updates: Record<string, ProxyContact> = {};
-            newContacts.forEach(c => {
-                const id = c.id;
-                const name = c.name || c.notify;
-                updates[id] = { id, name, pushName: c.notify };
-                if (c.lid) {
-                    localLidMap[c.lid] = id;
-                    updates[c.lid] = { id, name, pushName: c.notify };
-                }
-            });
-            setContacts(prev => ({ ...prev, ...updates }));
-        });
-
-        // 4. Nova Mensagem em Tempo Real (Pass-through do Servidor)
-        socket.on('whatsapp-message', (msg: any) => {
-            if (!msg.key || !msg.key.remoteJid) return;
-            let jid = msg.key.remoteJid;
-            jid = localLidMap[jid] || jid; // Resolve LID para JID se aplicável
-            
-            const text = extractTextFromWhatsAppMessage(msg);
-            if (!text) return;
-
-            const isOutbound = msg.key.fromMe;
-            const timestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now();
-            
-            const proxyMsg: ProxyMessage = {
-                id: msg.key.id,
-                text: text,
-                direction: isOutbound ? 'outbound' : 'inbound',
-                timestamp: timestamp,
-                status: 'delivered',
-                sender: msg.key.participant || jid
-            };
-
-            // Adiciona a mensagem à lista da conversa
-            setMessagesByChat(prev => {
-                const current = prev[jid] || [];
-                // Evita duplicatas se o ID já existir
-                if (current.find(m => m.id === proxyMsg.id)) return prev;
-                return { ...prev, [jid]: [...current, proxyMsg] };
-            });
-
-            // Promove o Chat para o topo e atualiza a última mensagem
-            setChats(prev => {
-                const existing = prev[jid];
-                const type = jid.endsWith('@g.us') ? 'group' : 'individual';
-                
-                let lastMessageSender = '';
-                if (type === 'group' && !isOutbound && (msg.key.participant || jid)) {
-                    const senderJid = msg.key.participant || jid;
-                    const senderContact = contacts[senderJid];
-                    lastMessageSender = senderContact?.pushName || senderContact?.name || senderJid.split('@')[0];
-                }
-
-                return {
-                    ...prev,
-                    [jid]: {
-                        id: jid,
-                        name: existing?.name || msg.pushName || jid.split('@')[0],
-                        lastMessage: text,
-                        lastMessageSender: lastMessageSender || existing?.lastMessageSender,
-                        lastMessageTime: timestamp,
-                        pinned: existing?.pinned || 0,
-                        unreadCount: isOutbound ? 0 : ((existing?.unreadCount || 0) + 1),
-                        type: existing?.type || type as any
-                    }
-                };
-            });
-            
-            // Registra contato temporário se não existir (para pegar o PushName)
-            if (msg.pushName) {
-                setContacts(prev => {
-                    if (prev[jid]?.name) return prev;
-                    return { ...prev, [jid]: { id: jid, name: msg.pushName, pushName: msg.pushName } };
-                });
-            }
-        });
-
-        return () => { socket.disconnect(); };
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     // Busca foto do perfil sob demanda (Lazy Loading)
@@ -351,7 +319,7 @@ export default function ChatPage() {
             // Por simplicidade, faremos isso no on-click ou para todos
             if (selectedJid && chats[selectedJid] && !contacts[selectedJid]?.imgUrl) {
                 try {
-                    const res = await fetch(`${API_URL}/api/chat/profile-pic/${selectedJid}`);
+                    const res = await fetch(`${WA_API_URL}/api/chat/profile-pic/${selectedJid}`);
                     if (res.ok) {
                         const { url } = await res.json();
                         setContacts(prev => ({
@@ -378,7 +346,7 @@ export default function ChatPage() {
 
         setIsSending(true);
         try {
-            const response = await fetch(`${API_URL}/api/chat/send`, {
+            const response = await fetch(`${WA_API_URL}/api/chat/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -417,7 +385,7 @@ export default function ChatPage() {
     const handleDisconnect = async () => {
         setIsDisconnecting(true);
         try {
-            const response = await fetch(`${API_URL}/api/chat/disconnect`, { method: "POST" });
+            const response = await fetch(`${WA_API_URL}/api/chat/disconnect`, { method: "POST" });
             if (!response.ok) throw new Error("Erro ao desconectar");
             toast.success("Sessão do WhatsApp encerrada e tela limpa!");
         } catch (error: any) {

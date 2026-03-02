@@ -1,12 +1,20 @@
 // ─── Configuração Central de URLs ────────────────────────────────────────────
 //
-// Esta lógica detecta o ambiente automaticamente:
+//  ARQUITETURA DE DOIS BACKENDS:
 //
-//  LOCAL  → frontend em localhost (qualquer porta) → usa http://localhost:3000
-//  VERCEL → frontend em captu.vercel.app            → usa https://captu-jqjg.vercel.app
+//  1. VERCEL (Serverless)  → captu-jqjg.vercel.app
+//     └── /api/leads       → CRUD de leads
+//     └── /api/campaigns   → CRUD de campanhas
 //
-// Para alterar a URL do backend de produção, basta mudar VITE_BACKEND_URL
-// nas variáveis de ambiente da Vercel (Settings → Environment Variables).
+//  2. RAILWAY (Persistent) → definido em VITE_WA_BACKEND_URL
+//     └── /api/chat/*      → QR Code, status, envio de mensagens WhatsApp
+//
+//  O WhatsApp (Baileys) exige conexão TCP persistente → Railway/Render/VPS
+//  A Vercel Serverless mata processos após 30s → INCOMPATÍVEL com Baileys
+//
+//  Para configurar em produção:
+//    - VITE_API_URL     → URL do backend Vercel (se diferente do padrão)
+//    - VITE_WA_API_URL  → URL do backend Railway com WhatsApp
 // ─────────────────────────────────────────────────────────────────────────────
 
 const isLocalhost =
@@ -16,22 +24,25 @@ const isLocalhost =
         window.location.hostname.startsWith('192.168.') ||  // rede local
         window.location.hostname.startsWith('10.'));        // rede local corporativa
 
-// VITE_BACKEND_URL → variável de ambiente do Vite (opcional, sobrescreve tudo)
-// Em desenvolvimento, o .env.local pode definir isso para um backend alternativo.
-const envBackendUrl = import.meta.env.VITE_API_URL as string | undefined;
+// Variáveis de ambiente do Vite (opcionais, sobrescrevem tudo)
+const envApiUrl = import.meta.env.VITE_API_URL as string | undefined;
+const envWaApiUrl = import.meta.env.VITE_WA_API_URL as string | undefined;
 
-// URL pública do backend em produção na Vercel
+// URLs padrão por ambiente
 const PRODUCTION_BACKEND_URL = 'https://captu-jqjg.vercel.app';
-
-// URL do backend local (padrão Express na porta 3000)
 const LOCAL_BACKEND_URL = 'http://localhost:3000';
 
-export const API_URL: string = envBackendUrl
-    ? envBackendUrl                                        // Variável de ambiente prevalece
+// Backend REST (Leads, Campanhas) → Vercel Serverless
+export const API_URL: string = envApiUrl
+    ? envApiUrl
     : isLocalhost
-        ? LOCAL_BACKEND_URL                                // Desenvolvimento local
-        : PRODUCTION_BACKEND_URL;                         // Produção (Vercel)
+        ? LOCAL_BACKEND_URL
+        : PRODUCTION_BACKEND_URL;
 
-// ─── Supabase ─────────────────────────────────────────────────────────────────
-// Lidas no cliente Supabase em src/integrations/supabase/client.ts
-// ─────────────────────────────────────────────────────────────────────────────
+// Backend WhatsApp (QR Code, Chat) → Railway / servidor persistente
+// Se VITE_WA_API_URL não estiver definido, aponta para o mesmo backend (dev local)
+export const WA_API_URL: string = envWaApiUrl
+    ? envWaApiUrl
+    : isLocalhost
+        ? LOCAL_BACKEND_URL   // local: tudo no mesmo processo
+        : PRODUCTION_BACKEND_URL; // produção: deve ser substituído pelo Railway URL
