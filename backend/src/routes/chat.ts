@@ -132,15 +132,16 @@ router.get('/status', (req, res) => {
     res.json(whatsapp.getStatus());
 });
 
+// GET /api/chat/history - Retorna o histórico de chats em cache (para carregamento instantâneo)
+router.get('/history', (req, res) => {
+    res.json(whatsapp.getHistoryCache());
+});
+
 // GET /api/chat/profile-pic/:jid
 router.get('/profile-pic/:jid', async (req, res) => {
     try {
         const url = await whatsapp.getProfilePicture(req.params.jid);
-        if (url) {
-            res.json({ url });
-        } else {
-            res.status(404).json({ error: 'Profile picture not found' });
-        }
+        res.json({ url: url || null });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

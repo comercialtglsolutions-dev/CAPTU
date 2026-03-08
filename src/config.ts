@@ -40,9 +40,8 @@ export const API_URL: string = envApiUrl
         : PRODUCTION_BACKEND_URL;
 
 // Backend WhatsApp (QR Code, Chat) → Railway / servidor persistente
-// Se VITE_WA_API_URL não estiver definido, aponta para o mesmo backend (dev local)
 export const WA_API_URL: string = envWaApiUrl
     ? envWaApiUrl
     : isLocalhost
-        ? LOCAL_BACKEND_URL   // local: tudo no mesmo processo
-        : PRODUCTION_BACKEND_URL; // produção: deve ser substituído pelo Railway URL
+        ? LOCAL_BACKEND_URL
+        : 'https://captu-backend-production.up.railway.app'; // URL do Railway (Ajustar se necessário)

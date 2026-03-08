@@ -15,13 +15,17 @@ const port = process.env.PORT || 3000;
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
-        // Permitir Vercel, Localhost e requisições sem origin (como mobile ou Postman)
+        // Permitir Vercel, Localhost (qualquer porta) e requisições sem origin
         const allowedOrigins = [
             'https://captu.vercel.app',
             'http://localhost:5173',
-            'http://localhost:3000'
+            'http://localhost:3000',
+            'http://localhost:8081'
         ];
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        
+        const isLocalhost = origin ? /^http:\/\/localhost:\d+$/.test(origin) : true;
+
+        if (!origin || allowedOrigins.includes(origin) || isLocalhost || origin.endsWith('.vercel.app')) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));

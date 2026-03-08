@@ -90,21 +90,27 @@ interface ProxyChat {
 
 function extractTextFromWhatsAppMessage(msg: any): string {
     if (!msg.message) return "";
-    return msg.message?.conversation ||
-           msg.message?.extendedTextMessage?.text ||
-           msg.message?.imageMessage?.caption ||
-           msg.message?.videoMessage?.caption ||
-           (msg.message?.buttonsResponseMessage ? `Botão: ${msg.message.buttonsResponseMessage.selectedDisplayText}` : '') ||
-           (msg.message?.imageMessage ? '[Imagem]' : 
-            msg.message?.videoMessage ? '[Vídeo]' : 
-            msg.message?.audioMessage ? '[Áudio]' : 
-            msg.message?.documentMessage ? '[Documento]' : 
-            msg.message?.contactMessage ? '[Contato]' : 
-            msg.message?.locationMessage ? '[Localização]' : 
-            msg.message?.stickerMessage ? '[Figurinha]' : 
-            msg.message?.reactionMessage ? '[Reação]' : 
-            msg.message?.pollCreationMessage ? '[Enquete]' : 
-            msg.message?.protocolMessage ? '[Mensagem de Sistema]' : '');
+    
+    const messageContent = msg.message;
+    let text = messageContent?.conversation ||
+           messageContent?.extendedTextMessage?.text ||
+           messageContent?.imageMessage?.caption ||
+           messageContent?.videoMessage?.caption ||
+           messageContent?.templateButtonReplyMessage?.selectedId ||
+           messageContent?.buttonsResponseMessage?.selectedDisplayText ||
+           messageContent?.listResponseMessage?.title || "";
+
+    if (messageContent?.imageMessage) return `📷 ${text || 'Foto'}`;
+    if (messageContent?.videoMessage) return `🎥 ${text || 'Vídeo'}`;
+    if (messageContent?.audioMessage) return `🎤 Áudio`;
+    if (messageContent?.documentMessage) return `📄 Documento`;
+    if (messageContent?.stickerMessage) return `🏷️ Figurinha`;
+    if (messageContent?.locationMessage) return `📍 Localização`;
+    if (messageContent?.contactMessage || messageContent?.contactsArrayMessage) return `👤 Contato`;
+    if (messageContent?.pollCreationMessage) return `📊 Enquete`;
+    if (messageContent?.reactionMessage) return `❤️ Reação`;
+    
+    return text || (messageContent?.protocolMessage ? 'Mensagem de Sistema' : '');
 }
 
 export default function ChatPage() {
@@ -129,36 +135,147 @@ export default function ChatPage() {
     const [isDisconnecting, setIsDisconnecting] = useState(false);
     const [isSyncing, setIsSyncing] = useState(true);
 
+    // Estados para Progresso Atômico 6.0
+    const [syncPercentage, setSyncPercentage] = useState(0);
+    const [syncStage, setSyncStage] = useState<string>("Iniciando...");
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Função centralizada para processar histórico de mensagens/chats/contatos
+    const processHistory = (payload: any, localLidMap: Record<string, string>) => {
+        const { chats: rawChats, messages: rawMessages, contacts: rawContacts } = payload;
+        
+        const contactsMap: Record<string, ProxyContact> = {};
+        if (rawContacts) {
+            rawContacts.forEach((c: any) => {
+                const id = c.id;
+                const name = c.name || c.notify || c.verifiedName || id.split('@')[0];
+                contactsMap[id] = { id, name, pushName: c.notify, imgUrl: c.imgUrl };
+                if (c.lid) {
+                    localLidMap[c.lid] = id;
+                    contactsMap[c.lid] = { id, name, pushName: c.notify, imgUrl: c.imgUrl };
+                }
+            });
+        }
+        setContacts(prev => ({ ...prev, ...contactsMap }));
+
+        const messagesMap: Record<string, ProxyMessage[]> = {};
+        if (rawMessages) {
+            rawMessages.forEach((msg: any) => {
+                if (!msg.key || !msg.key.remoteJid) return;
+                let jid = msg.key.remoteJid;
+                jid = localLidMap[jid] || jid;
+                const text = extractTextFromWhatsAppMessage(msg);
+                if (!text) return;
+                const proxyMsg: ProxyMessage = {
+                    id: msg.key.id,
+                    text: text,
+                    direction: msg.key.fromMe ? 'outbound' : 'inbound',
+                    timestamp: msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now(),
+                    status: 'delivered',
+                    sender: msg.key.participant || jid
+                };
+                if (!messagesMap[jid]) messagesMap[jid] = [];
+                messagesMap[jid].push(proxyMsg);
+            });
+        }
+        setMessagesByChat(prev => ({ ...prev, ...messagesMap }));
+
+        const chatsMap: Record<string, ProxyChat> = {};
+        if (rawChats) {
+            rawChats.forEach((chat: any) => {
+                let jid = chat.id;
+                jid = localLidMap[jid] || jid;
+                const type = jid.endsWith('@g.us') ? 'group' : jid.endsWith('@newsletter') ? 'community' : 'individual';
+                const contactName = contactsMap[jid]?.name || chat.name || chat.verifiedName || jid.split('@')[0];
+                const jidMsgs = messagesMap[jid];
+                const lastMsgObj = jidMsgs && jidMsgs.length > 0 ? jidMsgs[jidMsgs.length - 1] : null;
+                const lastText = lastMsgObj ? lastMsgObj.text : '';
+                
+                let lastMessageSender = '';
+                if (type === 'group' && lastMsgObj && lastMsgObj.direction === 'inbound') {
+                    const senderJid = lastMsgObj.sender || '';
+                    const senderContact = contactsMap[senderJid];
+                    lastMessageSender = senderContact?.pushName || senderContact?.name || senderJid.split('@')[0] || '';
+                }
+
+                const lastTime = chat.conversationTimestamp 
+                    ? (typeof chat.conversationTimestamp === 'object' ? Number(chat.conversationTimestamp.low || 0) * 1000 : Number(chat.conversationTimestamp) * 1000)
+                    : (lastMsgObj ? lastMsgObj.timestamp : 0);
+
+                chatsMap[jid] = {
+                    id: jid,
+                    name: contactName,
+                    lastMessage: lastText,
+                    lastMessageSender: lastMessageSender,
+                    lastMessageTime: lastTime,
+                    pinned: chat.pinned ? Number(chat.pinned) : 0,
+                    unreadCount: chat.unreadCount || 0,
+                    type: type as any
+                };
+            });
+        }
+        setChats(prev => ({ ...prev, ...chatsMap }));
+    };
+
+    const lidMapRef = useRef<Record<string, string>>({});
+
+    const fetchHistory = async () => {
+        try {
+            const resHistory = await fetch(`${WA_API_URL}/api/chat/history`);
+            if (resHistory.ok) {
+                const historicalData = await resHistory.json();
+                if (historicalData && historicalData.chats) {
+                    processHistory(historicalData, lidMapRef.current);
+                    setIsSyncing(false);
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao buscar histórico:", e);
+        }
+        return false;
+    };
+
     useEffect(() => {
-        // Busca Status Inicial
-        const fetchInitialStatus = async () => {
+        // Busca Status Inicial e Histórico do Cache
+        const initializeChat = async () => {
             try {
-                const res = await fetch(`${WA_API_URL}/api/chat/status`);
-                if (res.ok) {
-                    const data = await res.json();
+                // 1. Status
+                const resStatus = await fetch(`${WA_API_URL}/api/chat/status`);
+                if (resStatus.ok) {
+                    const data = await resStatus.json();
                     if (data.connection) setWaStatus(data.connection);
                     if (data.qr) setWaQr(data.qr);
                     if (data.isPaired !== undefined) setIsPaired(!!data.isPaired);
-                    if (data.connection === 'open') setIsSyncing(false);
+                    if (data.syncPercentage !== undefined) setSyncPercentage(data.syncPercentage);
+                    if (data.connection === 'open') {
+                        setIsSyncing(false);
+                        if (data.syncPercentage === 100) setSyncPercentage(100);
+                        fetchHistory(); // Busca imediata se já estiver aberto
+                    }
                 }
+
+                // 2. Histórico (Carregamento do cache persistente se houver)
+                fetchHistory();
             } catch (e) {
-                console.error("Erro ao buscar status inicial:", e);
+                console.error("Erro na inicialização do chat:", e);
             }
         };
-        fetchInitialStatus();
+        initializeChat();
     }, []);
 
     useEffect(() => {
-        let timeout: ReturnType<typeof setTimeout>;
         if (waStatus === 'open') {
-            timeout = setTimeout(() => setIsSyncing(false), 8000);
-        } else {
+            setIsSyncing(false);
+        } else if (waStatus === 'connecting' || waStatus === 'syncing') {
             setIsSyncing(true);
+            if (waStatus === 'connecting') {
+                setSyncPercentage(0);
+                setSyncStage("Aguardando...");
+            }
         }
-        return () => clearTimeout(timeout);
     }, [waStatus]);
 
     // ─── Conexão Realtime (Bypass Vercel WebSocket Block) ──────────────────
@@ -173,83 +290,36 @@ export default function ChatPage() {
                 setWaQr(qr);
                 setIsPaired(!!isPaired);
 
+                if (connection === 'open') {
+                    setIsSyncing(false);
+                    fetchHistory(); // Busca via HTTP (Confiável para pacotes grandes)
+                }
+
                 if (connection === 'close') {
                     setChats({});
                     setMessagesByChat({});
                     setContacts({});
                     setSelectedJid(null);
                     setIsSyncing(true);
+                    setSyncPercentage(0);
+                    setSyncStage("Conectando...");
                     for (const key in localLidMap) delete localLidMap[key];
                 }
             })
+            .on('broadcast', { event: 'sync-progress' }, ({ payload }) => {
+                const { percentage, stage } = payload;
+                setSyncPercentage(percentage);
+                setSyncStage(stage);
+            })
+            .on('broadcast', { event: 'sync-ready' }, () => {
+                console.log("[WhatsApp] Sincronização Atômica concluída no backend. Buscando dados via HTTP...");
+                setSyncPercentage(100);
+                setSyncStage("Sincronizado!");
+                fetchHistory(); // Gatilho final quando o backend termina a janela de acúmulo
+            })
             .on('broadcast', { event: 'history' }, ({ payload }) => {
-                const { chats: rawChats, messages: rawMessages, contacts: rawContacts } = payload;
-                
-                const contactsMap: Record<string, ProxyContact> = {};
-                if (rawContacts) {
-                    rawContacts.forEach((c: any) => {
-                        const id = c.id;
-                        const name = c.name || c.notify || c.verifiedName || id.split('@')[0];
-                        contactsMap[id] = { id, name, pushName: c.notify };
-                        if (c.lid) {
-                            localLidMap[c.lid] = id;
-                            contactsMap[c.lid] = { id, name, pushName: c.notify };
-                        }
-                    });
-                }
-                setContacts(prev => ({ ...prev, ...contactsMap }));
-
-                const messagesMap: Record<string, ProxyMessage[]> = {};
-                if (rawMessages) {
-                    rawMessages.forEach((msg: any) => {
-                        if (!msg.key || !msg.key.remoteJid) return;
-                        let jid = msg.key.remoteJid;
-                        jid = localLidMap[jid] || jid;
-                        const text = extractTextFromWhatsAppMessage(msg);
-                        if (!text) return;
-                        const proxyMsg: ProxyMessage = {
-                            id: msg.key.id,
-                            text: text,
-                            direction: msg.key.fromMe ? 'outbound' : 'inbound',
-                            timestamp: msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) * 1000 : Number(msg.messageTimestamp) * 1000) : Date.now(),
-                            status: 'delivered',
-                            sender: msg.key.participant || jid
-                        };
-                        if (!messagesMap[jid]) messagesMap[jid] = [];
-                        messagesMap[jid].push(proxyMsg);
-                    });
-                }
-                setMessagesByChat(prev => ({ ...prev, ...messagesMap }));
-
-                const chatsMap: Record<string, ProxyChat> = {};
-                if (rawChats) {
-                    rawChats.forEach((chat: any) => {
-                        let jid = chat.id;
-                        jid = localLidMap[jid] || jid;
-                        const type = jid.endsWith('@g.us') ? 'group' : jid.endsWith('@newsletter') ? 'community' : 'individual';
-                        const contactName = contactsMap[jid]?.name || chat.name || chat.verifiedName || jid.split('@')[0];
-                        const jidMsgs = messagesMap[jid];
-                        const lastMsgObj = jidMsgs && jidMsgs.length > 0 ? jidMsgs[jidMsgs.length - 1] : null;
-                        const lastText = lastMsgObj ? lastMsgObj.text : '';
-                        let lastMessageSender = '';
-                        if (type === 'group' && lastMsgObj && lastMsgObj.direction === 'inbound' && lastMsgObj.sender) {
-                            const senderContact = contactsMap[lastMsgObj.sender];
-                            lastMessageSender = senderContact?.pushName || senderContact?.name || lastMsgObj.sender.split('@')[0];
-                        }
-                        const lastTime = chat.conversationTimestamp ? (typeof chat.conversationTimestamp === 'object' ? Number(chat.conversationTimestamp.low || 0) * 1000 : Number(chat.conversationTimestamp) * 1000) : (lastMsgObj ? lastMsgObj.timestamp : 0);
-                        chatsMap[jid] = {
-                            id: jid,
-                            name: contactName,
-                            lastMessage: lastText,
-                            lastMessageSender: lastMessageSender,
-                            lastMessageTime: lastTime,
-                            pinned: chat.pinned ? Number(chat.pinned) : 0,
-                            unreadCount: chat.unreadCount || 0,
-                            type: type as any
-                        };
-                    });
-                }
-                setChats(prev => ({ ...prev, ...chatsMap }));
+                // Fallback para pacotes menores
+                processHistory(payload, lidMapRef.current);
                 setIsSyncing(false);
             })
             .on('broadcast', { event: 'new-message' }, ({ payload: msg }) => {
@@ -276,13 +346,21 @@ export default function ChatPage() {
                 setChats(prev => {
                     const existing = prev[jid];
                     const type = jid.endsWith('@g.us') ? 'group' : 'individual';
+                    
+                    let senderName = '';
+                    if (type === 'group' && !isOutbound) {
+                        const senderJid = msg.key.participant || '';
+                        const senderContact = contacts[senderJid];
+                        senderName = msg.pushName || senderContact?.pushName || senderContact?.name || senderJid.split('@')[0] || '';
+                    }
+
                     return {
                         ...prev,
                         [jid]: {
                             id: jid,
                             name: existing?.name || msg.pushName || jid.split('@')[0],
                             lastMessage: text,
-                            lastMessageSender: existing?.lastMessageSender,
+                            lastMessageSender: senderName || existing?.lastMessageSender,
                             lastMessageTime: timestamp,
                             pinned: existing?.pinned || 0,
                             unreadCount: isOutbound ? 0 : ((existing?.unreadCount || 0) + 1),
@@ -311,27 +389,10 @@ export default function ChatPage() {
         };
     }, []);
 
-    // Busca foto do perfil sob demanda (Lazy Loading)
-    useEffect(() => {
-        const fetchProfiles = async () => {
-            const neededJids = Object.keys(chats).filter(jid => !contacts[jid]?.imgUrl);
-            // Pegue apenas os primeiros visíveis ou de quem você clicou para não sobrecarregar
-            // Por simplicidade, faremos isso no on-click ou para todos
-            if (selectedJid && chats[selectedJid] && !contacts[selectedJid]?.imgUrl) {
-                try {
-                    const res = await fetch(`${WA_API_URL}/api/chat/profile-pic/${selectedJid}`);
-                    if (res.ok) {
-                        const { url } = await res.json();
-                        setContacts(prev => ({
-                            ...prev,
-                            [selectedJid]: { ...prev[selectedJid], id: selectedJid, imgUrl: url }
-                        }));
-                    }
-                } catch (e) {}
-            }
-        };
-        fetchProfiles();
-    }, [selectedJid, chats]);
+    // A busca de fotos agora é feita de forma atômica no BACKEND durante o sync inicial
+    // para garantir o carregamento instantâneo no frontend
+
+
 
     // ─── Efeitos de UI ────────────────────────────────────────────────────────
 
@@ -401,25 +462,21 @@ export default function ChatPage() {
     const sortedChats = useMemo(() => {
         return Object.values(chats)
             .filter(c => {
-                // Remove chats sem mensagens reais (time 0 e não fixado vazios)
-                if (!c.lastMessageTime && !c.pinned) return false;
-                
                 // Filtro de Busca Local em RAM
                 const contact = contacts[c.id];
                 const displayName = contact?.name || contact?.pushName || c.name || c.id;
                 return displayName.toLowerCase().includes(searchQuery.toLowerCase()) || c.id.includes(searchQuery);
             })
             .sort((a, b) => {
-                // Chats Fixados (Pinned) vem primeiro na ordem do Timestamp
+                // Prioridade 1: Chats Fixados (Pinned)
                 const pinnedA = a.pinned || 0;
                 const pinnedB = b.pinned || 0;
+                if (pinnedA !== pinnedB) return pinnedB - pinnedA;
                 
-                if (pinnedA > 0 || pinnedB > 0) {
-                    if (pinnedA !== pinnedB) return pinnedB - pinnedA;
-                }
-                
-                // Secundário: Ordena por última mensagem
-                return (b.lastMessageTime || 0) - (a.lastMessageTime || 0);
+                // Prioridade 2: Ordem Cronológica estrita (conforme celular)
+                const timeA = a.lastMessageTime || 0;
+                const timeB = b.lastMessageTime || 0;
+                return timeB - timeA;
             });
     }, [chats, contacts, searchQuery]);
 
@@ -471,16 +528,18 @@ export default function ChatPage() {
 
                 <ScrollArea className="flex-1">
                     <div className="divide-y divide-border/30">
-                        {waStatus !== 'open' ? (
+                        {waStatus === 'syncing' || (waStatus === 'open' && sortedChats.length === 0 && isSyncing) ? (
+                            <div className="p-8 text-center space-y-4">
+                                <Loader2 className="h-10 w-10 mx-auto animate-spin text-emerald-500/50" />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-emerald-600/80">Sincronização Atômica...</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Otimizando mídias e contatos</p>
+                                </div>
+                            </div>
+                        ) : waStatus !== 'open' ? (
                             <div className="p-8 text-center space-y-4">
                                 <p className="text-sm text-muted-foreground">Conecte seu WhatsApp para carregar suas conversas do celular.</p>
                                 <Button variant="outline" onClick={() => setIsWaModalOpen(true)}>Vincular Agora</Button>
-                            </div>
-                        ) : sortedChats.length === 0 && isSyncing ? (
-                            <div className="p-8 text-center space-y-4">
-                                <Loader2 className="h-10 w-10 mx-auto animate-spin text-emerald-500/50" />
-                                <p className="text-sm font-semibold text-emerald-600/80">Obtendo banco de mensagens...</p>
-                                <p className="text-xs text-muted-foreground mx-auto">Isso leva apenas alguns instantes.</p>
                             </div>
                         ) : sortedChats.length === 0 && !isSyncing ? (
                             <div className="p-8 text-center space-y-2">
@@ -537,6 +596,9 @@ export default function ChatPage() {
                                             </div>
 
                                             <p className="text-xs text-muted-foreground truncate line-clamp-1">
+                                                {chat.type === 'group' && chat.lastMessageSender && (
+                                                    <span className="text-emerald-600/70 font-medium mr-1">~ {chat.lastMessageSender}:</span>
+                                                )}
                                                 {chat.lastMessage || "Toque para ver..."}
                                             </p>
                                         </div>
@@ -706,16 +768,18 @@ export default function ChatPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col items-center justify-center py-6 space-y-6">
-                        {waStatus === 'open' ? (
-                            <div className="w-full space-y-6 animate-in fade-in">
-                                <div className="w-48 h-48 mx-auto flex items-center justify-center bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                                    <CheckCheck className="w-16 h-16 text-emerald-500" />
+                        {waStatus === 'open' && syncPercentage === 100 ? (
+                            <div className="w-full space-y-6 animate-in fade-in zoom-in duration-500">
+                                <div className="w-40 h-40 mx-auto flex items-center justify-center bg-emerald-500/10 rounded-full border-4 border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                                    <CheckCheck className="w-16 h-16 text-emerald-500 animate-bounce" />
                                 </div>
                                 <div className="text-center">
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 mb-4 border-emerald-500/20">Sincronizado com sucesso</Badge>
+                                    <Badge className="bg-emerald-500/10 text-emerald-600 mb-6 border-emerald-500/20 px-6 py-2 text-md font-bold">
+                                        Sincronizado com sucesso!
+                                    </Badge>
                                     <Button 
                                         variant="destructive" 
-                                        className="w-full font-bold gap-2"
+                                        className="w-full font-bold gap-2 h-12 shadow-lg"
                                         onClick={handleDisconnect}
                                         disabled={isDisconnecting}
                                     >
@@ -726,18 +790,60 @@ export default function ChatPage() {
                             </div>
                         ) : (
                             <div className="w-full space-y-6">
-                                {waQr ? (
-                                    <div className="p-4 bg-white rounded-2xl mx-auto w-fit">
-                                        <img src={waQr} alt="QR Code" className="w-56 h-56" />
+                                {(waStatus === 'syncing' || (waStatus === 'open' && syncPercentage < 100)) ? (
+                                    <div className="text-center w-full space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                                        <div className="relative w-32 h-32 mx-auto">
+                                            <div className="absolute inset-0 rounded-full border-8 border-primary/5" />
+                                            <div 
+                                                className="absolute inset-0 rounded-full border-8 border-primary border-t-transparent animate-spin" 
+                                                style={{ animationDuration: '2s' }}
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-3xl font-black text-primary leading-none">
+                                                        {(syncPercentage === 100 && waStatus !== 'open') ? 99 : (syncPercentage || 5)}%
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Status</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4 px-8">
+                                            <div className="h-3 w-full bg-secondary rounded-full overflow-hidden border border-border/10">
+                                                <div 
+                                                    className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(var(--primary),0.6)]"
+                                                    style={{ width: `${syncPercentage || 5}%` }}
+                                                />
+                                            </div>
+                                            
+                                            <div className="flex flex-col gap-2 items-center">
+                                                <Badge variant="outline" className="px-5 py-2 border-primary/20 bg-primary/5 text-primary font-bold text-[11px] tracking-widest uppercase animate-pulse">
+                                                    {syncPercentage >= 95 ? 'FINALIZANDO PROTOCOLO' : syncStage}
+                                                </Badge>
+                                                <p className="text-[11px] text-muted-foreground font-medium italic opacity-70">
+                                                    {syncPercentage >= 95 
+                                                        ? 'Aguardando sinal verde do seu celular...' 
+                                                        : 'Sincronizando conversas do aparelho...'}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="w-56 h-56 mx-auto flex items-center justify-center bg-muted rounded-2xl">
-                                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        {waQr ? (
+                                            <div className="p-5 bg-white rounded-3xl mx-auto w-fit shadow-xl border border-border/40">
+                                                <img src={waQr} alt="QR Code" className="w-56 h-56" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-56 h-56 mx-auto flex items-center justify-center bg-muted rounded-2xl">
+                                                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                                            </div>
+                                        )}
+                                        <p className="text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground animate-pulse">
+                                            {waStatus === 'connecting' ? 'Iniciando Bridge' : 'Aguardando Leitura'}
+                                        </p>
                                     </div>
                                 )}
-                                <p className="text-center text-xs font-bold uppercase tracking-widest text-muted-foreground animate-pulse">
-                                    {waStatus === 'connecting' ? 'Iniciando Bridge' : 'Aguardando Leitura'}
-                                </p>
                             </div>
                         )}
                     </div>
