@@ -13,7 +13,7 @@ import {
   LogOut,
   Moon,
   Sun,
-  Menu
+  Menu,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isPipeline = location.pathname === "/contacts";
 
-  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
   const logoSrc = isDark ? "/captu-white.png" : "/captu.png";
 
   // Close mobile menu on route change
@@ -98,18 +101,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           "hidden lg:flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
-          collapsed ? "w-[68px]" : "w-[240px]"
+          collapsed ? "w-[68px]" : "w-[240px]",
         )}
       >
         {/* Logo */}
         <div className="flex h-16 items-center border-b border-sidebar-border px-4 overflow-hidden">
           <Link to="/" className="flex items-center gap-2 overflow-hidden">
             <img
-              src={collapsed ? "/captu-collapsed.png" : logoSrc}
+              src={collapsed ? "/sidebar-logo.png" : logoSrc}
               alt="CAPTU Logo"
               className={cn(
                 "h-50 w-auto transition-all duration-300",
-                collapsed ? "min-w-[16px]" : "min-w-[120px]"
+                collapsed ? "min-w-[16px]" : "min-w-[120px]",
               )}
             />
           </Link>
@@ -127,11 +130,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? "bg-sidebar-accent text-sidebar-primary"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span className="animate-fade-in">{item.label}</span>}
+                {!collapsed && (
+                  <span className="animate-fade-in">{item.label}</span>
+                )}
               </Link>
             );
           })}
@@ -162,7 +167,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? "bg-sidebar-accent text-sidebar-primary"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
@@ -202,7 +207,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile Header */}
         <header className="lg:hidden flex h-20 items-center justify-between border-b border-sidebar-border bg-sidebar px-6 shrink-0 relative">
           <div className="w-12" /> {/* Spacer */}
-          <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <Link
+            to="/"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          >
             <img src={logoSrc} alt="CAPTU Logo" className="h-11 w-auto" />
           </Link>
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -211,7 +219,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Menu className="h-7 w-7" />
               </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] p-0 border-r-sidebar-border bg-sidebar">
+            <SheetContent
+              side="left"
+              className="w-[280px] p-0 border-r-sidebar-border bg-sidebar"
+            >
               <SheetHeader className="h-20 border-b border-sidebar-border px-6 flex-row items-center justify-between space-y-0">
                 <SheetTitle className="text-left">
                   <img src={logoSrc} alt="CAPTU Logo" className="h-12 w-auto" />
@@ -229,7 +240,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           "flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
                           active
                             ? "bg-sidebar-accent text-sidebar-primary"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         )}
                       >
                         <item.icon className="h-5 w-5 shrink-0" />
@@ -250,7 +261,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           "flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
                           active
                             ? "bg-sidebar-accent text-sidebar-primary"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         )}
                       >
                         <item.icon className="h-5 w-5 shrink-0" />
@@ -259,7 +270,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     );
                   })}
                   <button
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    onClick={() =>
+                      setTheme(theme === "dark" ? "light" : "dark")
+                    }
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                   >
                     {theme === "dark" ? (
@@ -289,10 +302,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Main */}
         <main className="flex-1 overflow-auto bg-background flex flex-col">
-          <div className={cn(
-            "flex-1 flex flex-col mx-auto w-full",
-            location.pathname === "/chat" ? "max-w-full p-0 overflow-hidden" : (isPipeline ? "max-w-full p-4 md:p-6 lg:p-8" : "max-w-7xl p-4 md:p-6 lg:p-8")
-          )}>
+          <div
+            className={cn(
+              "flex-1 flex flex-col mx-auto w-full",
+              location.pathname === "/chat"
+                ? "max-w-full p-0 overflow-hidden"
+                : isPipeline
+                  ? "max-w-full p-4 md:p-6 lg:p-8"
+                  : "max-w-7xl p-4 md:p-6 lg:p-8",
+            )}
+          >
             {children}
           </div>
         </main>
@@ -303,12 +322,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você será desconectado da sua conta e precisará fazer login novamente para acessar a plataforma.
+              Você será desconectado da sua conta e precisará fazer login
+              novamente para acessar a plataforma.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleLogout}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Sair
             </AlertDialogAction>
           </AlertDialogFooter>
