@@ -32,7 +32,7 @@ const corsOptions: cors.CorsOptions = {
         }
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey', 'x-instance-name'],
     credentials: true,
 };
 
@@ -74,6 +74,8 @@ if (process.env.VERCEL) {
 
     // Inicializa o WhatsApp DEPOIS que o servidor já está ouvindo
     // O delay garante que o healthcheck do Railway passe antes de qualquer operação pesada
+    // Desativado motor Baileys local — agora usamos Evolution API
+    /*
     setTimeout(async () => {
         try {
             const { WhatsAppService } = await import('./services/whatsapp.js');
@@ -83,7 +85,8 @@ if (process.env.VERCEL) {
         } catch (err) {
             console.error('[WhatsApp] ⚠️ Falha ao inicializar motor (servidor continua rodando):', err);
         }
-    }, 2000); // Aguarda 2s para o healthcheck passar antes de iniciar o WhatsApp
+    }, 2000);
+    */
 }
 
 export default app;

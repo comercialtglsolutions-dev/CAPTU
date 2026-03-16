@@ -425,15 +425,42 @@ export class WhatsAppService {
             });
 
             this.socket.ev.on('messages.upsert', async (m: any) => {
-                if (m.type === 'notify') {
+                if (m.type === 'notify' || m.type === 'append') {
                     this.mergeMessages(m.messages);
                     for (const msg of m.messages) {
+                        const jid = msg.key?.remoteJid;
+                        if (!jid) continue;
+                        
+                        // Atualiza o timestamp do chat no cache para refletir mensagens recebidas offline ("append")
+                        const chatIdx = this.historyCache.chats.findIndex(c => c.id === jid);
+                        const msgTimestamp = msg.messageTimestamp ? (typeof msg.messageTimestamp === 'object' ? Number(msg.messageTimestamp.low || 0) : Number(msg.messageTimestamp)) : Math.floor(Date.now() / 1000);
+                        
+                        if (chatIdx > -1) {
+                            const currentTimestamp = Number(this.historyCache.chats[chatIdx].conversationTimestamp?.low || this.historyCache.chats[chatIdx].conversationTimestamp || 0);
+                            if (msgTimestamp > currentTimestamp) {
+                                this.historyCache.chats[chatIdx].conversationTimestamp = msgTimestamp;
+                            }
+                        } else {
+                            // Se o chat não existia no cache, cria um básico
+                            this.historyCache.chats.push({ id: jid, conversationTimestamp: msgTimestamp });
+                        }
+
                         this.broadcastEvent('new-message', msg);
                         // Se for mensagem de grupo, tenta forçar sincronização de participantes
-                        if (msg.key.remoteJid?.endsWith('@g.us')) {
-                            this.syncGroupMetadata(msg.key.remoteJid);
+                        if (jid.endsWith('@g.us')) {
+                            this.syncGroupMetadata(jid);
                         }
                     }
+                    
+                    // Re-ordena os chats após atualizações
+                    this.historyCache.chats.sort((a: any, b: any) => {
+                        const tA = Number(a.conversationTimestamp?.low || a.conversationTimestamp || 0);
+                        const tB = Number(b.conversationTimestamp?.low || b.conversationTimestamp || 0);
+                        if (a.pinned && !b.pinned) return -1;
+                        if (!a.pinned && b.pinned) return 1;
+                        return tB - tA;
+                    });
+                    
                     this.saveCache();
                 }
             });
@@ -506,7 +533,14 @@ export class WhatsAppService {
             const chatMsgs = this.historyCache.messages[jid] || [];
             const msg = chatMsgs.find(m => m.key.id === msgId);
             
-            if (!msg || (!msg.message?.imageMessage && !msg.message?.videoMessage && !msg.message?.audioMessage && !msg.message?.stickerMessage)) return null;
+            if (!msg || (
+                !msg.message?.imageMessage && 
+                !msg.message?.videoMessage && 
+                !msg.message?.audioMessage && 
+                !msg.message?.stickerMessage &&
+                !msg.message?.documentMessage &&
+                !msg.message?.documentWithCaptionMessage
+            )) return null;
             
             const buffer = await downloadMediaMessage(
                 msg,
@@ -529,10 +563,54 @@ export class WhatsAppService {
         return this.historyCache.messages[jid] || [];
     }
 
-    public async sendMessage(chatId: string, message: string) {
+    public async sendMessage(chatId: string, message: string, quotedMessage?: any) {
         if (!this.socket || this.connectionState !== 'open') throw new Error('WhatsApp não está conectado');
         const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
-        await this.socket.sendMessage(jid, { text: message });
+        const options = quotedMessage ? { quoted: quotedMessage } : {};
+        await this.socket.sendMessage(jid, { text: message }, options);
+    }
+
+    public async sendMedia(chatId: string, buffer: Buffer, mimetype: string, originalname: string, caption?: string) {
+        if (!this.socket || this.connectionState !== 'open') throw new Error('WhatsApp não está conectado');
+        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+        
+        let messageType: any = {};
+        
+        if (mimetype.startsWith('image/')) {
+            messageType = { image: buffer, caption: caption };
+        } else if (mimetype.startsWith('video/')) {
+            messageType = { video: buffer, caption: caption, mimetype: mimetype };
+        } else if (mimetype.startsWith('audio/')) {
+            // Se for audio de voz (ogg) envia como ptt, senão como audio normal
+            messageType = { audio: buffer, mimetype: mimetype, ptt: mimetype.includes('ogg') };
+        } else {
+            // Qualquer outro arquivo envia como documento
+            messageType = { 
+                document: buffer, 
+                mimetype: mimetype || 'application/octet-stream', 
+                fileName: originalname,
+                caption: caption 
+            };
+        }
+
+        await this.socket.sendMessage(jid, messageType);
+    }
+
+    public async sendReaction(chatId: string, messageKey: any, reaction: string) {
+        if (!this.socket || this.connectionState !== 'open') throw new Error('WhatsApp não está conectado');
+        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+        await this.socket.sendMessage(jid, {
+            react: {
+                text: reaction,
+                key: messageKey
+            }
+        });
+    }
+
+    public async deleteMessage(chatId: string, messageKey: any) {
+        if (!this.socket || this.connectionState !== 'open') throw new Error('WhatsApp não está conectado');
+        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+        await this.socket.sendMessage(jid, { delete: messageKey });
     }
 
     public async disconnect() {
