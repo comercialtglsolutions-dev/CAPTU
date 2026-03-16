@@ -105,7 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-16 items-center border-b border-sidebar-border px-4 overflow-hidden">
           <Link to="/" className="flex items-center gap-2 overflow-hidden">
             <img
-              src={collapsed ? "/captu-collapsed.png" : logoSrc}
+              src={collapsed ? "/sidebar-logo.png" : logoSrc}
               alt="CAPTU Logo"
               className={cn(
                 "h-50 w-auto transition-all duration-300",
