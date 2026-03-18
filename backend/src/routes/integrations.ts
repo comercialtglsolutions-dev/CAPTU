@@ -6,16 +6,18 @@ const router = express.Router();
 // HubSpot Configuration
 const HUBSPOT_CLIENT_ID = process.env.HUBSPOT_CLIENT_ID;
 const HUBSPOT_CLIENT_SECRET = process.env.HUBSPOT_CLIENT_SECRET;
-const HUBSPOT_REDIRECT_URI = process.env.NODE_ENV === 'production' 
-  ? 'https://captu.vercel.app/api/auth/callback/hubspot' 
-  : 'http://localhost:3000/api/auth/callback/hubspot';
+const HUBSPOT_REDIRECT_URI = process.env.HUBSPOT_REDIRECT_URI || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://captu.vercel.app/api/auth/callback/hubspot' 
+    : 'http://localhost:3000/api/auth/callback/hubspot');
 
 // Pipedrive Configuration
 const PIPEDRIVE_CLIENT_ID = process.env.PIPEDRIVE_CLIENT_ID;
 const PIPEDRIVE_CLIENT_SECRET = process.env.PIPEDRIVE_CLIENT_SECRET;
-const PIPEDRIVE_REDIRECT_URI = process.env.NODE_ENV === 'production' 
-  ? 'https://captu.vercel.app/api/auth/callback/pipedrive' 
-  : 'http://localhost:3000/api/auth/callback/pipedrive';
+const PIPEDRIVE_REDIRECT_URI = process.env.PIPEDRIVE_REDIRECT_URI || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://captu.vercel.app/api/auth/callback/pipedrive' 
+    : 'http://localhost:3000/api/auth/callback/pipedrive');
 
 /**
  * GET /api/auth/integrations/:id
@@ -26,12 +28,13 @@ router.get('/integrations/:id', (req, res) => {
   
   if (id === 'hubspot') {
     const scopes = 'crm.objects.contacts.read crm.objects.contacts.write';
-    const authUrl = `https://app.hubspot.com/oauth/authorize?client_id=${HUBSPOT_CLIENT_ID}&redirect_uri=${HUBSPOT_REDIRECT_URI}&scope=${scopes}`;
+    const authUrl = `https://app.hubspot.com/oauth/authorize?client_id=${HUBSPOT_CLIENT_ID}&redirect_uri=${encodeURIComponent(HUBSPOT_REDIRECT_URI as string)}&scope=${scopes}`;
     return res.redirect(authUrl);
   }
 
   if (id === 'pipedrive') {
-    const authUrl = `https://oauth.pipedrive.com/oauth/authorize?client_id=${PIPEDRIVE_CLIENT_ID}&redirect_uri=${PIPEDRIVE_REDIRECT_URI}`;
+    const authUrl = `https://oauth.pipedrive.com/oauth/authorize?client_id=${PIPEDRIVE_CLIENT_ID}&redirect_uri=${encodeURIComponent(PIPEDRIVE_REDIRECT_URI as string)}`;
+    console.log('[Pipedrive] Redirecting to:', authUrl);
     return res.redirect(authUrl);
   }
   
