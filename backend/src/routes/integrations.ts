@@ -16,8 +16,8 @@ const PIPEDRIVE_CLIENT_ID = process.env.PIPEDRIVE_CLIENT_ID;
 const PIPEDRIVE_CLIENT_SECRET = process.env.PIPEDRIVE_CLIENT_SECRET;
 const PIPEDRIVE_REDIRECT_URI = process.env.PIPEDRIVE_REDIRECT_URI || 
   (process.env.NODE_ENV === 'production' 
-    ? 'https://captu.vercel.app/api/auth/callback/pipedrive' 
-    : 'http://localhost:3000/api/auth/callback/pipedrive');
+    ? 'https://captu.vercel.app' 
+    : 'http://localhost:3000');
 
 /**
  * GET /api/auth/integrations/:id
