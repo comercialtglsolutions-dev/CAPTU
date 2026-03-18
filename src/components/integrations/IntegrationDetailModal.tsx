@@ -55,8 +55,11 @@ export function IntegrationDetailModal({
       const left = typeof window !== 'undefined' ? window.screenX + (window.outerWidth - width) / 2 : 0;
       const top = typeof window !== 'undefined' ? window.screenY + (window.outerHeight - height) / 2 : 0;
       
-      // Development URL pointing to localhost:3000
-      const authUrl = `http://localhost:3000/api/auth/integrations/${integration.id}?tenant_id=current_tenant`;
+      // Automatically detect backend URL based on current environment
+      const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000' 
+        : 'https://captu.vercel.app';
+      const authUrl = `${backendUrl}/api/auth/integrations/${integration.id}?tenant_id=current_tenant`;
       
       const popup = window.open(
         authUrl,
