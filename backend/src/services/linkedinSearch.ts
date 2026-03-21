@@ -30,7 +30,7 @@ export const searchLinkedinCompanies = async (query: string, city: string) => {
             const leadInfo: LeadData = {
                 name: name,
                 address: city,
-                website: result.url, 
+                website: undefined, 
                 segment: query,
                 image_url: null
             };

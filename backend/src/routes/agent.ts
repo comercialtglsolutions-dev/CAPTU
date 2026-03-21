@@ -1,6 +1,8 @@
 import express from 'express';
 import axios from 'axios';
 import { IntegrationService } from '../services/integrationService.js';
+import { searchLeads } from '../services/googlePlaces.js';
+import { searchLinkedinCompanies } from '../services/linkedinSearch.js';
 
 const router = express.Router();
 
@@ -62,27 +64,161 @@ const CAPTU_TOOLS = [
   {
     type: "function",
     function: {
-      name: "listar_canais_slack",
-      description: "Retorna a lista de canais públicos (nome e ID) disponíveis no Workspace do Slack do usuário para que o agente saiba onde pode postar mensagens.",
-      parameters: { type: "object", properties: {} }
+      name: "criar_nova_campanha",
+      description: "Cria uma nova campanha de prospecção no banco de dados. Use isso quando o usuário der o 'OK' para o seu plano estratégico. IMPORTANTE: O campo niche é usado para salvar o Script/Template da mensagem.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nome da campanha (ex: Prospecção Barbearias SP)" },
+          message_script: { type: "string", description: "O script de prospecção completo com placeholders {{segment}}, {{city}}, etc." },
+          daily_limit: { type: "number", description: "Limite de envios por dia. Padrão 50." },
+          city: { type: "string", description: "Cidade alvo opcional." }
+        },
+        required: ["name", "message_script"]
+      }
     }
   },
   {
     type: "function",
     function: {
-      name: "enviar_mensagem_slack",
-      description: "Envia uma mensagem de texto profissional para um canal específico do Slack do usuário. Use isso para notificar o time sobre leads, mandar resumos estratégicos ou alertas de conversão.",
+      name: "pesquisar_leads_google",
+      description: "Inicia uma pesquisa técnica e salvamento automático de leads via Google Maps. Use parâmetros idênticos à interface manual.",
       parameters: {
         type: "object",
         properties: {
-          channel_id: { type: "string", description: "O ID do canal do Slack (ex: C12345). Obtenha este ID usando a ferramenta listar_canais_slack primeiro se não souber." },
-          text: { type: "string", description: "O conteúdo formatado da mensagem." }
+          query: { type: "string", description: "Nicho ou segmento (ex: 'Oficinas Mecânicas')" },
+          location: { type: "string", description: "Cidade/Região (ex: 'São Paulo, SP')" },
+          radius: { type: "number", description: "Raio de busca em metros (ex: 15000 para 15km). Padrão 15000." },
+          min_rating: { type: "number", description: "Avaliação mínima (0 a 5). Padrão 0." },
+          min_reviews: { type: "number", description: "Mínimo de avaliações. Padrão 0." },
+          only_without_website: { type: "boolean", description: "Se verdadeiro, busca apenas empresas sem site próprio." },
+          only_with_phone: { type: "boolean", description: "Se verdadeiro, busca apenas empresas com telefone listado." }
         },
-        required: ["channel_id", "text"]
+        required: ["query", "location"]
       }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "pesquisar_leads_linkedin",
+      description: "Inicia uma pesquisa técnica e salvamento automático de leads/empresas via LinkedIn.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Setor ou cargo (ex: 'Diretores de Marketing')" },
+          city: { type: "string", description: "Cidade de busca (ex: 'Curitiba')" }
+        },
+        required: ["query", "city"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "adicionar_leads_campanha",
+      description: "Adiciona uma lista de IDs de leads a uma campanha específica. Use isso quando o usuário der o OK para incluir leads encontrados em uma campanha.",
+      parameters: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string", description: "O ID da campanha de destino." },
+          lead_ids: { type: "array", items: { type: "string" }, description: "Lista de IDs dos leads a serem adicionados." }
+        },
+        required: ["campaign_id", "lead_ids"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "verificar_ferramentas_conectadas",
+      description: "Consulta quais ferramentas externas (CRMs, Planilhas, etc) o usuário possui conectadas no CAPTU (ex: Pipedrive, HubSpot, Google Sheets). Use isso sempre que o usuário perguntar o que está conectado ou se a IA tem acesso a tal ferramenta.",
+      parameters: { type: "object", properties: {} }
     }
   }
 ];
+
+// ─── DESPACHANTE CENTRAL DE FERRAMENTAS ──────────────────────────────────────
+async function handleToolCalls(toolCalls: any[], userId: string | undefined, dbClient: any) {
+  const results: any[] = [];
+  
+  for (const tool of toolCalls) {
+    let toolResult: any;
+    const name = tool.function?.name || tool.name; // Suporta OpenAI e Gemini formats
+    const args = typeof tool.function?.arguments === 'string' ? JSON.parse(tool.function.arguments || '{}') : (tool.args || tool.function?.arguments || {});
+
+    console.log(`[CAPTU AI] Executando Tool: ${name}`, args);
+
+    if (name === 'buscar_leads_qualificados') {
+      const limit = args.limit || 10;
+      const { data, error } = await dbClient.from('leads').select('*').limit(limit).order('created_at', { ascending: false });
+      toolResult = error ? { erro: error.message } : (data || []).map((l: any) => ({ id: l.id, n: l.name, ph: l.phone, st: l.status }));
+
+    } else if (name === 'buscar_campanhas_ativas') {
+      const limit = args.limit || 5;
+      const { data, error } = await dbClient.from('campaigns').select('*').limit(limit).order('created_at', { ascending: false });
+      toolResult = error ? { erro: error.message } : (data || []).map((c: any) => ({ id: c.id, name: c.name, status: c.status, niche: c.niche }));
+
+    } else if (name === 'relatorio_geral_projeto') {
+      try {
+        const [leads, camps, hist] = await Promise.all([
+          dbClient.from('leads').select('*', { count: 'exact', head: true }),
+          dbClient.from('campaigns').select('*', { count: 'exact', head: true }),
+          dbClient.from('contact_history').select('*', { count: 'exact', head: true })
+        ]);
+        toolResult = { total_leads: leads.count || 0, total_campanhas: camps.count || 0, total_contatos: hist.count || 0 };
+      } catch (e: any) { toolResult = { erro: e.message }; }
+
+    } else if (name === 'criar_nova_campanha') {
+      const { data, error } = await dbClient.from('campaigns').insert({
+        name: args.name,
+        niche: args.message_script,
+        daily_limit: args.daily_limit || 50,
+        city: args.city || null,
+        status: 'Pausada'
+      }).select();
+      toolResult = error ? { erro: error.message } : { sucesso: true, mensagem: `Campanha '${args.name}' criada.`, id: data?.[0]?.id };
+
+    } else if (name === 'pesquisar_leads_google') {
+      try {
+        const filters = { radius: args.radius || 15000, minRating: args.min_rating || 0, minReviews: args.min_reviews || 0, onlyWithoutWebsite: args.only_without_website || false, onlyWithPhone: args.only_with_phone || false };
+        const leads = await searchLeads(args.query, args.location, filters);
+        if (leads && leads.length > 0) {
+          const leadsToSave = leads.map((l: any) => ({ ...l, origin: 'google_places' }));
+          await dbClient.from('leads').upsert(leadsToSave, { onConflict: 'place_id', ignoreDuplicates: true });
+          toolResult = { sucesso: true, mensagem: `${leads.length} leads salvos com sucesso.` };
+        } else { toolResult = { message: "Nenhum lead encontrado." }; }
+      } catch (e: any) { toolResult = { erro: e.message }; }
+
+    } else if (name === 'pesquisar_leads_linkedin') {
+      try {
+        const leads = await searchLinkedinCompanies(args.query, args.city);
+        if (leads && leads.length > 0) {
+          await dbClient.from('leads').upsert(leads, { onConflict: 'website', ignoreDuplicates: true });
+          toolResult = { sucesso: true, mensagem: `${leads.length} leads do LinkedIn salvos.` };
+        } else { toolResult = { message: "Nada no LinkedIn." }; }
+      } catch (e: any) { toolResult = { erro: e.message }; }
+
+    } else if (name === 'adicionar_leads_campanha') {
+      try {
+        const records = args.lead_ids.map((lid: string) => ({ campaign_id: args.campaign_id, lead_id: lid, status: 'pending' }));
+        const { error } = await dbClient.from('campaign_leads').upsert(records, { onConflict: 'campaign_id, lead_id' });
+        toolResult = error ? { erro: error.message } : { sucesso: true, mensagem: `${args.lead_ids.length} leads vinculados.` };
+      } catch (e: any) { toolResult = { erro: e.message }; }
+    } else if (name === 'verificar_ferramentas_conectadas') {
+      try {
+        const { data, error } = await dbClient.from('tenant_integrations').select('provider, is_active').eq('user_id', userId);
+        if (error) throw error;
+        toolResult = {
+          conectadas: (data || []).map((i: any) => ({ ferramenta: i.provider, status: i.is_active ? 'Ativa' : 'Inativa' }))
+        };
+      } catch (e: any) { toolResult = { erro: e.message }; }
+    }
+
+    results.push({ name, callId: tool.id || name, result: toolResult });
+  }
+  return results;
+}
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -143,8 +279,10 @@ Você pode ajudar com:
 - Análise de campanhas e métricas
 - Sugestões de follow-up e automações
 - Qualificação de leads por perfil de empresa
+- Verificação de ferramentas e CRMs conectados (Pipedrive, HubSpot, Sheets, etc.)
 
 Seja direto, profissional e focado em resultados de vendas. Responda sempre em português do Brasil.
+Você tem permissão para verificar quais ferramentas externas estão conectadas para dar respostas mais precisas sobre integrações.
 Use markdown quando útil: negrito para termos importantes, listas para sequências, tabelas para comparações.
 ${fileContent ? `\n\nO usuário enviou um arquivo com o seguinte conteúdo:\n${fileContent}` : ''}`;
 
@@ -156,24 +294,31 @@ ${fileContent ? `\n\nO usuário enviou um arquivo com o seguinte conteúdo:\n${f
         const { createClient } = await import('@supabase/supabase-js');
         const db = createClient(supabaseUrl, supabaseKey);
 
-        const [leadsRes, campsRes] = await Promise.all([
+          const [leadsRes, campsRes, contextRes] = await Promise.all([
           db.from('leads').select('*', { count: 'exact', head: true }),
-          db.from('campaigns').select('*').limit(10).order('created_at', { ascending: false })
+          db.from('campaigns').select('*').limit(10).order('created_at', { ascending: false }),
+          db.from('tenant_context').select('*').eq('user_id', userId).eq('is_active', true)
         ]);
 
         const totalLeads = leadsRes.count || 0;
         const recentCampaigns = (campsRes.data || []).map(c => `- ${c.name} (${c.status}): ${c.niche || 'Geral'}`).join('\n');
+        const userContextItems = (contextRes.data || []).map(ctx => `[${ctx.type.toUpperCase()}: ${ctx.name}] ${ctx.content?.substring(0, 10000)}`).join('\n\n');
 
-        captuContext += `\n\n--- DADOS EM REAL-TIME DO PROJETO ---\nNo momento, o usuário possui ${totalLeads} leads capturados no banco de dados.\nCampanhas recentes:\n${recentCampaigns || 'Nenhuma campanha criada ainda.'}\n-------------------------------------\n
-INSTRUÇÕES ESTRATÉGICAS (MANDATÓRIO):
-1. Você é o BRAÇO DIREITO do usuário na prospecção B2B. Suas respostas devem ser COMPLETAS, PROFUNDAS e ESTRUTURADAS como um relatório de consultoria de alto nível. NUNCA dê respostas curtas ou apenas uma tabela isolada.
-2. ESTRUTURA PADRÃO DE RESPOSTA:
-   - **Introdução Profissional**: Resumo da situação atual do projeto baseado nos dados em tempo real.
-   - **📋 Tabela de Resumo**: Listagem clara organizada por Campanha, Status, Nicho e Objetivo.
-   - **🔍 Análise Estratégica**: Decomponha os nichos (Barbearias, Vinícolas, etc.), analise o que está funcionando e o que pode melhorar.
-   - **💡 Insight do CAPTU AI**: Forneça recomendações acionáveis para scripts, fluxos de cadência ou prospecção de nichos.
-3. Use os dados de forma NATURAL (como se você estivesse logado no CAPTU). Não diga "conforme os dados que recebi".
-4. Seja proativo: se vir uma campanha pausada ou um nicho pouco explorado, sugira como reativar ou expandir.`;
+        captuContext += `\n\n--- DADOS EM REAL-TIME DO PROJETO ---\nNo momento, o usuário possui ${totalLeads} leads capturados no banco de dados.\nCampanhas recentes:\n${recentCampaigns || 'Nenhuma campanha criada ainda.'}\n-------------------------------------\n`;
+        
+        if (userContextItems) {
+          captuContext += `\n\n--- BASE DE CONHECIMENTO E CONTEXTO DO USUÁRIO ---\n${userContextItems}\n--------------------------------------------------\n`;
+        }
+
+        captuContext += `\nINSTRUÇÕES ESTRATÉGICAS (MANDATÓRIO):
+1. Você é o BRAÇO DIREITO do usuário na prospecção B2B. Sua comunicação deve ser **DIRETA, CONCISA E PROFISSIONAL**.
+2. **MODALIDADE DE RESPOSTA**: 
+   - Para perguntas simples ou confirmação de tarefas: Responda de forma curta e objetiva.
+   - Para pedidos de análise, resumos de projeto ou relatórios estratégicos: Use a **ESTRUTURA COMPLETA** (Introdução, Tabela, Análise, Insight). 
+   - Se não for um relatório, **NUNCA** repita a estrutura de tabelas em toda resposta.
+3. Use os dados de forma NATURAL e priorize as informações da BASE DE CONHECIMENTO acima para alinhar tom de voz e estratégias.
+4. **MANDATÓRIO: PERMISSÃO (HUMAN-IN-THE-LOOP)**: Antes de qualquer ação de escrita (buscar leads, criar campanha ou vincular contatos), você deve apresentar a estratégia e perguntar: "Posso prosseguir?". Só execute a ferramenta técnica APÓS o 'OK' do usuário.
+5. Se vir uma campanha pausada ou oportunidade, sugira ações acionáveis.`;
       }
     } catch (dbErr) {
       console.warn('[CAPTU AI] Falha ao injetar contexto vivo:', dbErr);
@@ -182,25 +327,57 @@ INSTRUÇÕES ESTRATÉGICAS (MANDATÓRIO):
     // ─── GEMINI ───────────────────────────────────────────────────────────────
     if (provider === 'gemini') {
       const activeKey = customKey || GEMINI_API_KEY;
-      if (!activeKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no sistema nem no seu painel de Integrações.' });
+      if (!activeKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada.' });
 
       const geminiContents = messages.map((msg: Message) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: msg.content }]
       }));
 
-      const response = await axios.post(
+      // Injeta ferramentas mapeadas para formato Gemini
+      const toolsManifest = [{ functionDeclarations: CAPTU_TOOLS.map(t => t.function) }];
+
+      const callGemini = async (contents: any[]) => axios.post(
         `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${activeKey}`,
-        {
-          contents: geminiContents,
+        { 
+          contents, 
           systemInstruction: { parts: [{ text: captuContext }] },
+          tools: toolsManifest,
           generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
-        },
-        { headers: { 'Content-Type': 'application/json' } }
+        }
       );
 
-      const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.';
-      return res.json({ reply: text, provider: 'gemini' });
+      let response = await callGemini(geminiContents);
+      let candidate = response.data.candidates?.[0];
+      let firstPart = candidate?.content?.parts?.[0];
+
+      // Suporte a Function Calling no Gemini
+      if (firstPart?.functionCall) {
+        console.log('[CAPTU AI] Gemini solicitou ferramentas:', firstPart.functionCall.name);
+        
+        const { createClient } = await import('@supabase/supabase-js');
+        const dbClient = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        
+        const toolResults = await handleToolCalls([firstPart.functionCall], userId, dbClient);
+
+        // Enviar resultados de volta para o Gemini
+        const updatedContents = [
+          ...geminiContents,
+          candidate.content,
+          {
+            role: 'function',
+            parts: toolResults.map(r => ({
+              functionResponse: { name: r.name, response: { content: r.result } }
+            }))
+          }
+        ];
+
+        const finalResponse = await callGemini(updatedContents);
+        const finalCandidate = finalResponse.data.candidates?.[0];
+        return res.json({ reply: finalCandidate?.content?.parts?.[0]?.text || 'Ação executada com sucesso.', provider: 'gemini' });
+      }
+
+      return res.json({ reply: firstPart?.text || 'Sem resposta.', provider: 'gemini' });
     }
 
     // ─── OPENAI ───────────────────────────────────────────────────────────────
@@ -236,176 +413,27 @@ INSTRUÇÕES ESTRATÉGICAS (MANDATÓRIO):
       let response = await makeOpenAICall(openaiMessages);
       let responseMsg = response.data.choices?.[0]?.message;
 
-      // Se a IA decidiu que precisa rodar a função no nosso banco:
       if (responseMsg?.tool_calls) {
-        console.log('[CAPTU AI] A IA solicitou acesso ao DB via Tools:', responseMsg.tool_calls.map((t:any) => t.function.name));
-        
-        // Conexão temporária com Supabase no server (usando Service Role para contornar RLS no back-end, cuidado se a arquitetura for Multi-Tenant sem ID no schema)
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
         const { createClient } = await import('@supabase/supabase-js');
-        const dbClient = createClient(supabaseUrl, supabaseKey);
+        const dbClient = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        
+        const toolResults = await handleToolCalls(responseMsg.tool_calls, userId, dbClient);
 
-        const toolMessages: any[] = [];
+        const updatedMessages = [
+          ...openaiMessages,
+          responseMsg,
+          ...toolResults.map(r => ({
+            role: 'tool',
+            tool_call_id: r.callId,
+            content: JSON.stringify(r.result)
+          }))
+        ];
 
-        for (const tool of responseMsg.tool_calls) {
-          let toolResult: any;
-          if (tool.function.name === 'buscar_leads_qualificados') {
-            const args = JSON.parse(tool.function.arguments || '{}');
-            const limit = args.limit || 10;
-            
-            console.log(`[CAPTU AI] Rodando query no Supabase: leads limit ${limit}`);
-            let query = dbClient.from('leads').select('*').limit(limit).order('created_at', { ascending: false });
-            
-            // Segurança: caso a tabela leads tenha user_id, nós filtaríamos aqui pelo `userId` do loop atual do backend: 
-            // if (userId) query = query.eq('user_id', userId);
-
-            const { data, error } = await query;
-
-            if (error) {
-              toolResult = { erro: error.message };
-            } else {
-              // Criptografar e minimizar colunas descartando nulls ou links Giga pra economizar Token e Dinheiro:
-              toolResult = (data || []).map((lead: any) => ({
-                id: lead.id,
-                n: lead.name,
-                emp: lead.company,
-                ph: lead.phone,
-                st: lead.status
-              }));
-              if (toolResult.length === 0) toolResult = "A tabela de leads está vazia. Informe que não há leads capturados no momento.";
-            }
-
-          } else if (tool.function.name === 'buscar_campanhas_ativas') {
-            const args = JSON.parse(tool.function.arguments || '{}');
-            const limit = args.limit || 5;
-            
-            console.log(`[CAPTU AI] Rodando query no Supabase: campaigns limit ${limit}`);
-            let query = dbClient.from('campaigns').select('*').limit(limit).order('created_at', { ascending: false });
-            
-            // Segurança por userId se existir
-            // if (userId) query = query.eq('user_id', userId);
-
-            const { data, error } = await query;
-
-            if (error) {
-              toolResult = { erro: error.message };
-            } else {
-              toolResult = (data || []).map((camp: any) => ({
-                id: camp.id,
-                name: camp.name,
-                status: camp.status,
-                daily_limit: camp.daily_limit,
-                sent_count: camp.sent_count,
-                niche: camp.niche
-              }));
-              if (toolResult.length === 0) toolResult = "Não há campanhas ativas no momento.";
-            }
-
-          } else if (tool.function.name === 'relatorio_geral_projeto') {
-            console.log(`[CAPTU AI] Rodando query no Supabase: relatorio geral`);
-            try {
-              const [leads, camps, hist, campLeads] = await Promise.all([
-                  dbClient.from('leads').select('*', { count: 'exact', head: true }),
-                  dbClient.from('campaigns').select('*', { count: 'exact', head: true }),
-                  dbClient.from('contact_history').select('*', { count: 'exact', head: true }),
-                  dbClient.from('campaign_leads').select('*', { count: 'exact', head: true })
-              ]);
-              toolResult = {
-                total_leads_capturados: leads.count || 0,
-                total_campanhas_criadas: camps.count || 0,
-                total_veces_que_um_lead_foi_contactado: hist.count || 0,
-                total_leads_em_fila_das_campanhas: campLeads.count || 0
-              };
-            } catch (err: any) {
-              toolResult = { erro: err.message };
-            }
-
-          } else if (tool.function.name === 'buscar_historico_contatos') {
-            const args = JSON.parse(tool.function.arguments || '{}');
-            const limit = args.limit || 5;
-            
-            console.log(`[CAPTU AI] Rodando query no Supabase: contact history limit ${limit}`);
-            const { data, error } = await dbClient.from('contact_history').select('*').limit(limit).order('data_envio', { ascending: false });
-            
-            if (error) {
-              toolResult = { erro: error.message };
-            } else {
-              toolResult = (data || []).map((h: any) => ({
-                id: h.company_id,
-                tipo_canal: h.type,
-                status_envio: h.status,
-                detalhe_mensagem: h.message,
-                data_hora: h.data_envio
-              }));
-              if (toolResult.length === 0) toolResult = "Nenhum histórico de contato encontrado. Nenhuma mensagem foi enviada ainda.";
-            }
-
-          } else if (tool.function.name === 'listar_canais_slack') {
-            console.log(`[CAPTU AI] Slack: Listando canais para o usuário ${userId}`);
-            try {
-              if (!userId) throw new Error("Usuário não identificado.");
-              const slackIntegration = await IntegrationService.getIntegration(userId, 'slack');
-              if (!slackIntegration || !slackIntegration.is_active || !slackIntegration.credentials?.access_token) {
-                throw new Error("Slack não conectado. Peça ao usuário para conectar o Slack na aba de Integrações.");
-              }
-              
-              const slackRes = await axios.get('https://slack.com/api/conversations.list', {
-                headers: { 'Authorization': `Bearer ${slackIntegration.credentials.access_token}` }
-              });
-
-              if (!slackRes.data.ok) throw new Error(slackRes.data.error || 'Erro na API do Slack');
-              
-              toolResult = (slackRes.data.channels || [])
-                .filter((c: any) => c.is_channel && !c.is_archived)
-                .map((c: any) => ({ id: c.id, name: c.name }));
-              
-            } catch (err: any) {
-              toolResult = { erro: err.message };
-            }
-
-          } else if (tool.function.name === 'enviar_mensagem_slack') {
-            const args = JSON.parse(tool.function.arguments || '{}');
-            console.log(`[CAPTU AI] Slack: Enviando mensagem para o canal ${args.channel_id}`);
-            try {
-              if (!userId) throw new Error("Usuário não identificado.");
-              const slackIntegration = await IntegrationService.getIntegration(userId, 'slack');
-              if (!slackIntegration || !slackIntegration.is_active || !slackIntegration.credentials?.access_token) {
-                throw new Error("Slack não conectado.");
-              }
-
-              const slackRes = await axios.post('https://slack.com/api/chat.postMessage', {
-                channel: args.channel_id,
-                text: args.text
-              }, {
-                headers: { 'Authorization': `Bearer ${slackIntegration.credentials.access_token}` }
-              });
-
-              if (!slackRes.data.ok) throw new Error(slackRes.data.error || 'Erro na API do Slack');
-              toolResult = { ok: true, ts: slackRes.data.ts, channel: args.channel_id };
-
-            } catch (err: any) {
-              toolResult = { erro: err.message };
-            }
-
-          } else {
-             toolResult = { erro: "Função não suportada" };
-          }
-
-          toolMessages.push({
-            role: "tool",
-            tool_call_id: tool.id,
-            content: JSON.stringify(toolResult)
-          });
-        }
-
-        // Fazer a segunda chamada de IA com os dados do banco
-        console.log('[CAPTU AI] Devolvendo dados do Supabase para a OpenAI montar a resposta...');
-        response = await makeOpenAICall([ ...openaiMessages, responseMsg, ...toolMessages ]);
-        responseMsg = response.data.choices?.[0]?.message;
+        const finalRes = await makeOpenAICall(updatedMessages);
+        responseMsg = finalRes.data.choices?.[0]?.message;
       }
 
-      const text = responseMsg?.content || 'Sem resposta após consultar os dados.';
+      const text = responseMsg?.content || 'Ações executadas com sucesso.';
       return res.json({ reply: text, provider: 'openai' });
     }
 

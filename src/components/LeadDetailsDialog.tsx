@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Info, MapPin, Phone, Mail, Globe, Star, Calendar, Send, Loader2, MessageSquare, Sparkles, Copy, Wand2, Activity } from "lucide-react";
+import { Building2, Info, MapPin, Phone, Mail, Globe, Star, Calendar, Send, Loader2, MessageSquare, Sparkles, Copy, Wand2, Activity, Instagram, Facebook, Linkedin } from "lucide-react";
 import ScoreBadge from "@/components/ScoreBadge";
 import { LeadHistory } from "@/components/LeadHistory";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +33,10 @@ interface Lead {
   updated_at?: string;
   status?: string;
   image_url?: string | null;
+  linkedin_url?: string;
+  instagram_url?: string;
+  facebook_url?: string;
+  whatsapp_url?: string;
   digital_health?: {
     has_website: boolean;
     is_social_only: boolean;
@@ -115,6 +119,19 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
     const wpUrl = `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(text)}`;
     window.open(wpUrl, "_blank");
   };
+
+  const getSocialLinks = () => {
+    const links = {
+      website: lead?.website && !lead.website.includes('instagram.com') && !lead.website.includes('facebook.com') && !lead.website.includes('linkedin.com') && !lead.website.includes('wa.me') ? lead.website : null,
+      instagram: lead?.instagram_url || (lead?.website?.includes('instagram.com') ? lead.website : null),
+      facebook: lead?.facebook_url || (lead?.website?.includes('facebook.com') ? lead.website : null),
+      linkedin: lead?.linkedin_url || (lead?.website?.includes('linkedin.com') ? lead.website : null),
+      whatsapp: lead?.whatsapp_url || (lead?.website?.includes('wa.me') || lead?.website?.includes('api.whatsapp.com') ? lead.website : null),
+    };
+    return links;
+  };
+
+  const socialLinks = getSocialLinks();
 
   if (!lead) return null;
 
@@ -218,17 +235,66 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
                       <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
                         <Globe className="h-3 w-3 text-primary" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Website</p>
-                        {lead.website ? (
-                          <a href={lead.website} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline break-all">
-                            {lead.website}
+                        {socialLinks.website ? (
+                          <a href={socialLinks.website} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline truncate block" title={socialLinks.website}>
+                            {socialLinks.website}
                           </a>
                         ) : (
                           <p className="text-xs font-medium text-muted-foreground italic">Não disponível</p>
                         )}
                       </div>
                     </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                        <Instagram className="h-3 w-3 text-pink-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Instagram</p>
+                        {socialLinks.instagram ? (
+                          <a href={socialLinks.instagram} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline truncate block" title={socialLinks.instagram}>
+                            {socialLinks.instagram}
+                          </a>
+                        ) : (
+                          <p className="text-xs font-medium text-muted-foreground italic">Não disponível</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                        <Linkedin className="h-3 w-3 text-blue-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">LinkedIn</p>
+                        {socialLinks.linkedin ? (
+                          <a href={socialLinks.linkedin} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline truncate block" title={socialLinks.linkedin}>
+                            {socialLinks.linkedin}
+                          </a>
+                        ) : (
+                          <p className="text-xs font-medium text-muted-foreground italic">Não disponível</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 bg-background p-1 rounded-md border border-border shadow-sm">
+                        <MessageSquare className="h-3 w-3 text-green-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">WhatsApp link</p>
+                        {socialLinks.whatsapp ? (
+                          <a href={socialLinks.whatsapp} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline truncate block" title={socialLinks.whatsapp}>
+                            {socialLinks.whatsapp}
+                          </a>
+                        ) : (
+                          <p className="text-xs font-medium text-muted-foreground italic">Não disponível</p>
+                        )}
+                      </div>
+                    </div>
+
 
                     {lead.email && (
                       <div className="flex items-start gap-3">
@@ -313,13 +379,6 @@ export function LeadDetailsDialog({ lead, open, onOpenChange }: LeadDetailsDialo
                         ))}
                       </div>
                     </div>
-                    {!lead.has_own_website && (
-                      <div className="p-2 rounded-lg bg-primary/5 border border-primary/10">
-                        <p className="text-[9px] text-primary font-bold leading-tight">
-                          💡 OPORTUNIDADE: Lead não possui site próprio. Abordagem sugerida: Desenvolvimento Web.
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

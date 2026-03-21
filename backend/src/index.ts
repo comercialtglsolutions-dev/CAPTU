@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat.js';
 import webhookRoutes from './routes/webhooks.js';
 import integrationRoutes from './routes/integrations.js';
 import agentRoutes from './routes/agent.js';
+import contextRoutes from './routes/context.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -50,15 +51,15 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', integrationRoutes);
 app.use('/api/agent', agentRoutes);
+app.use('/api/context', contextRoutes);
 
-// Health check - responde IMEDIATAMENTE (nunca bloqueia o startup)
+// Health check
 app.get('/', (_req, res) => {
     res.json({
         status: 'ok',
         message: 'CAPTU Backend API is operational',
         engine: 'Express',
         environment: process.env.VERCEL ? 'vercel-serverless' : 'persistent-active',
-        whatsapp_supported: !process.env.VERCEL,
         timestamp: new Date().toISOString(),
     });
 });
@@ -67,7 +68,6 @@ app.get('/', (_req, res) => {
 if (process.env.VERCEL) {
     console.log('[Vercel] ☁️ Rodando em ambiente Serverless (Somente API REST)');
 } else {
-    // O servidor escuta a porta PRIMEIRO — garante que o healthcheck passe imediatamente
     const server = app.listen(port, () => {
         console.log(`\n🚀 Backend CAPTU rodando → http://localhost:${port}`);
         console.log('─'.repeat(50));
@@ -77,22 +77,6 @@ if (process.env.VERCEL) {
         console.error('[Server] Erro ao iniciar:', err);
         process.exit(1);
     });
-
-    // Inicializa o WhatsApp DEPOIS que o servidor já está ouvindo
-    // O delay garante que o healthcheck do Railway passe antes de qualquer operação pesada
-    // Desativado motor Baileys local — agora usamos Evolution API
-    /*
-    setTimeout(async () => {
-        try {
-            const { WhatsAppService } = await import('./services/whatsapp.js');
-            const whatsapp = WhatsAppService.getInstance();
-            await whatsapp.initialize();
-            console.log('[WhatsApp] ✅ Motor inicializado com sucesso');
-        } catch (err) {
-            console.error('[WhatsApp] ⚠️ Falha ao inicializar motor (servidor continua rodando):', err);
-        }
-    }, 2000);
-    */
 }
 
 export default app;

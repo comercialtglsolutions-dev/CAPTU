@@ -82,14 +82,28 @@ export const searchLeads = async (query: string, city: string, filters: SearchFi
                         stateFromGoogle = 'N/A';
                     }
 
-                    const socialMediaDomains = ['facebook.com', 'instagram.com', 'whatsapp.com', 'wa.me', 'youtube.com', 'linkedin.com', 'linktr.ee'];
+                    const socialMediaDomains = ['facebook.com', 'instagram.com', 'whatsapp.com', 'wa.me', 'api.whatsapp.com', 'youtube.com', 'linkedin.com', 'linktr.ee'];
                     const website = details.website;
                     const hasOwnWebsite = website && !socialMediaDomains.some(domain => website.toLowerCase().includes(domain));
+
+                    // Mapeamento inteligente de social links
+                    let linkedinUrl = null;
+                    let instagramUrl = null;
+                    let whatsappUrl = null;
+                    let facebookUrl = null;
+
+                    if (website) {
+                        const ws = website.toLowerCase();
+                        if (ws.includes('linkedin.com')) linkedinUrl = website;
+                        if (ws.includes('instagram.com')) instagramUrl = website;
+                        if (ws.includes('facebook.com')) facebookUrl = website;
+                        if (ws.includes('wa.me') || ws.includes('whatsapp.com')) whatsappUrl = website;
+                    }
 
                     const leadInfo: LeadData = {
                         name: details.name || place.name,
                         address: details.formatted_address || place.formatted_address,
-                        website: website,
+                        website: hasOwnWebsite ? website : undefined, // Só salva no campo website se for site próprio
                         rating: details.rating || place.rating,
                         user_ratings_total: details.user_ratings_total || place.user_ratings_total,
                         phone: details.formatted_phone_number || place.formatted_phone_number,
@@ -109,7 +123,11 @@ export const searchLeads = async (query: string, city: string, filters: SearchFi
                         has_own_website: !!hasOwnWebsite,
                         origin: 'google_places',
                         latitude: location?.lat,
-                        longitude: location?.lng
+                        longitude: location?.lng,
+                        linkedin_url: linkedinUrl,
+                        instagram_url: instagramUrl,
+                        facebook_url: facebookUrl,
+                        whatsapp_url: whatsappUrl
                     };
                 } catch (err) {
                     console.error(`Error fetching details for ${place.name}:`, err);

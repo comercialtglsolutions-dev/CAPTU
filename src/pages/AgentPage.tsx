@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, Trash2, Download, Plus, MessageSquare, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Sparkles, Trash2, Download, Plus, MessageSquare, PanelLeft, PanelLeftClose, Search, Brain, Share2, Globe } from 'lucide-react';
+import { AgentContextManager } from '@/components/agent/AgentContextManager';
 import { Button } from '@/components/ui/button';
 import { MessageBubble, Message } from '@/components/agent/MessageBubble';
 import { ChatInput, ChatInputHandle } from '@/components/agent/ChatInput';
@@ -7,6 +8,7 @@ import { AIModelSelector, AI_MODELS_CONFIG, AIModel } from '@/components/agent/A
 import { API_URL } from '@/config';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const WELCOME_SUGGESTIONS = [
   '📋 Criar script de prospecção B2B',
@@ -33,6 +35,8 @@ export default function AgentPage() {
   const [selectedModel, setSelectedModel] = useState<AIModel>(AI_MODELS_CONFIG[0]);
   const [userSession, setUserSession] = useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isContextOpen, setIsContextOpen] = useState(false);
+  const { toast } = useToast();
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -373,8 +377,14 @@ export default function AgentPage() {
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex flex-col h-full flex-1 max-w-4xl mx-auto w-full relative bg-background">
+      {/* Main Chat Area - Workspace Wrapper */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-x-hidden relative bg-background">
+        
+        {/* Centered Chat Container */}
+        <div className={cn(
+          "flex flex-col h-full mx-auto w-full transition-all duration-500 ease-in-out",
+          messages.some(m => m.content.includes('|') || m.content.includes('<table>')) ? "max-w-7xl" : "max-w-4xl"
+        )}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-6 pb-4 flex-shrink-0">
@@ -406,8 +416,19 @@ export default function AgentPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-9 h-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+              onClick={() => setIsContextOpen(true)}
+              title="Ajustar Base de Conhecimento (Contexto)"
+            >
+              <Brain className="w-4 h-4 text-primary" />
+            </Button>
+
             <AIModelSelector selected={selectedModel} onSelect={setSelectedModel} />
+            
             {messages.length > 0 && (
               <Button
                 variant="ghost"
@@ -426,7 +447,7 @@ export default function AgentPage() {
         <div className="h-px bg-border/40 mx-4 flex-shrink-0" />
 
         {/* Chat Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-5 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-5 custom-scrollbar">
           {isEmpty ? (
             /* Welcome Screen */
             <div className="flex flex-col items-center justify-center h-full gap-8 text-center pb-10 animate-in fade-in duration-500">
@@ -489,7 +510,6 @@ export default function AgentPage() {
             </>
           )}
         </div>
-
         {/* Input Area */}
         <div className="flex-shrink-0 px-4 pb-6 pt-2">
           <ChatInput 
@@ -500,14 +520,13 @@ export default function AgentPage() {
             onCancelEdit={() => setEditingMessageId(null)}
           />
         </div>
+        </div>
       </div>
 
-      {/* Espaçador Fantasma - Mantém o chat centralizado na tela sem deslocar */}
-      <div 
-        className={cn(
-          "flex-shrink-0 transition-all duration-300 ease-in-out hidden lg:block pointer-events-none",
-          isSidebarOpen ? "w-[260px]" : "w-0"
-        )}
+      <AgentContextManager 
+        userId={userSession?.user?.id || ''} 
+        isOpen={isContextOpen} 
+        onClose={() => setIsContextOpen(false)} 
       />
     </div>
   );

@@ -76,46 +76,6 @@ const INITIAL_INTEGRATIONS: Integration[] = [
     uuid: "crm-sf-12"
   },
   
-  // APPS - Communication
-  {
-    id: "slack",
-    name: "Slack",
-    description: "Receba notificações imediatas no seu canal do Slack a cada novo lead qualificado.",
-    icon: "https://www.google.com/s2/favicons?domain=slack.com&sz=128",
-    category: "apps",
-    type: "Comunicação",
-    status: "not_connected",
-    author: "CAPTU Official",
-    website: "https://slack.com",
-    privacyPolicy: "https://slack.com/privacy",
-    uuid: "comm-slack-03"
-  },
-  {
-    id: "discord",
-    name: "Discord",
-    description: "Notifique seu time de vendas via webhooks diretamente em seus servidores.",
-    icon: "https://www.google.com/s2/favicons?domain=discord.com&sz=128",
-    category: "apps",
-    type: "Comunicação",
-    status: "not_connected",
-    author: "CAPTU Official",
-    website: "https://discord.com",
-    privacyPolicy: "https://discord.com/privacy",
-    uuid: "comm-disc-13"
-  },
-  {
-    id: "telegram",
-    name: "Telegram",
-    description: "Receba alertas instantâneos de novos leads no seu BOT do Telegram.",
-    icon: "https://www.google.com/s2/favicons?domain=telegram.org&sz=128",
-    category: "apps",
-    type: "Comunicação",
-    status: "not_connected",
-    author: "CAPTU Official",
-    website: "https://telegram.org",
-    privacyPolicy: "https://telegram.org/privacy",
-    uuid: "comm-tg-14"
-  },
 
   // APPS - Productivity
   {
@@ -510,7 +470,7 @@ export default function IntegrationsPage() {
     }
     
     // Lista de integrações que utilizam o nosso fluxo de OAuth
-    const oauthIntegrations = ['hubspot', 'pipedrive', 'salesforce', 'slack'];
+    const oauthIntegrations = ['hubspot', 'pipedrive', 'salesforce'];
     
     if (oauthIntegrations.includes(id)) {
       toast({
@@ -573,9 +533,6 @@ export default function IntegrationsPage() {
 
   return (
     <div className="flex flex-col h-full space-y-10 max-w-6xl mx-auto w-full pb-20 px-4 pt-4 text-foreground">
-      {/* Overview Section */}
-      <IntegrationOverview />
-
       {/* Main Connectors Section */}
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">

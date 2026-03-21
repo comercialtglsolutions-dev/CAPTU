@@ -57,10 +57,15 @@ export function MessageBubble({ message, onEdit, onResend }: MessageBubbleProps)
       )}
 
       {/* Bubble */}
-      <div className={cn("relative max-w-[92%] sm:max-w-[85%] flex flex-col", isUser ? "items-end" : "items-start")}>
+      <div className={cn(
+        "relative flex flex-col transition-all duration-300", 
+        isUser 
+          ? "max-w-[92%] sm:max-w-[85%] items-end" 
+          : (message.content.includes('|') || message.content.includes('<table>')) ? "max-w-full w-full items-start" : "max-w-[92%] sm:max-w-[85%] items-start"
+      )}>
         <div 
           className={cn(
-            'rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm overflow-x-auto min-w-0',
+            'rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm break-words min-w-0',
             isUser
               ? 'bg-secondary text-secondary-foreground rounded-tr-sm border border-border/30'
               : 'bg-card border border-border/60 text-foreground rounded-tl-sm'
@@ -81,7 +86,7 @@ export function MessageBubble({ message, onEdit, onResend }: MessageBubbleProps)
                 rehypePlugins={[rehypeRaw]}
                 components={{
                    table({node, ...props}) {
-                     return <div className="overflow-x-auto my-6 rounded-xl border border-border/60 shadow-sm"><table className="w-full border-collapse text-left table-auto" {...props} /></div>
+                     return <div className="my-6 rounded-xl border border-border/60 shadow-sm overflow-hidden"><table className="w-full border-collapse text-left table-auto" {...props} /></div>
                    },
                    thead({node, ...props}) {
                      return <thead className="bg-muted/60 text-muted-foreground" {...props} />
@@ -100,7 +105,7 @@ export function MessageBubble({ message, onEdit, onResend }: MessageBubbleProps)
                    h3({node, ...props}) { return <h3 className="text-base font-bold mt-5 mb-2.5 text-primary" {...props} /> },
                    h4({node, ...props}) { return <h4 className="text-[15px] font-bold mt-4 mb-2" {...props} /> },
                    h5({node, ...props}) { return <h5 className="text-[11px] font-extrabold mt-3 mb-1 uppercase text-muted-foreground/90 tracking-widest border-l-2 border-primary pl-2" {...props} /> },
-                   p({node, ...props}) { return <p className="mb-4 last:mb-0" {...props} /> },
+                   p({node, ...props}) { return <p className="mb-4 last:mb-0 whitespace-pre-wrap break-words" {...props} /> },
                    hr({node, ...props}) { return <hr className="my-8 border-border/50" {...props} /> },
                 }}
               >
