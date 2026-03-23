@@ -1,3 +1,4 @@
+/** CAPTU Vibe - Monitoramento Autônomo e Profissional **/
 import { useState, useMemo } from "react";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";

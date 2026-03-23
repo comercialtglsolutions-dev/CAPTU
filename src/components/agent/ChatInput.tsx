@@ -1,11 +1,12 @@
 import React, { useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Paperclip, Send, X } from 'lucide-react';
+import { Paperclip, Send, X, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from "@/components/ThemeProvider";
 
 interface ChatInputProps {
   onSend: (text: string, file?: { name: string; content: string }) => void;
+  onCancel?: () => void;
   isLoading: boolean;
   isEditing?: boolean;
   onCancelEdit?: () => void;
@@ -23,7 +24,7 @@ const QUICK_COMMANDS = [
   { label: '🗓️ Follow-up', value: 'Crie uma sequência de follow-up de 5 etapas para um lead que não respondeu meu primeiro contato.' },
 ];
 
-export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, isLoading, isEditing, onCancelEdit }, ref) => {
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, onCancel, isLoading, isEditing, onCancelEdit }, ref) => {
   const [text, setText] = useState('');
   const [file, setFile] = useState<{ name: string; content: string } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
@@ -60,6 +61,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (isLoading) return; // Evita enviar enquanto carrega, embora o botão mude
       handleSend();
     }
   };
@@ -181,14 +183,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, 
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 resize-none outline-none py-2 max-h-[200px] leading-relaxed"
         />
 
-        {/* Send Button */}
+        {/* Action Button (Send / Stop) */}
         <Button
-          onClick={handleSend}
-          disabled={isLoading || (!text.trim() && !file)}
+          onClick={isLoading ? onCancel : handleSend}
+          disabled={!isLoading && !text.trim() && !file}
           size="icon"
-          className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary hover:bg-primary/90 shadow-sm mb-0.5"
+          className={cn(
+            "flex-shrink-0 w-9 h-9 rounded-xl shadow-sm mb-0.5 transition-all duration-300 transform active:scale-95",
+            isLoading 
+              ? "bg-red-500 hover:bg-red-600 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]" 
+              : "bg-primary hover:bg-primary/90"
+          )}
+          title={isLoading ? "Cancelar geração" : "Enviar mensagem"}
         >
-          <Send className="w-4 h-4" />
+          {isLoading ? (
+            <Square className="w-3.5 h-3.5 fill-current" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
         </Button>
       </div>
 
@@ -198,3 +210,4 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, 
     </div>
   );
 });
+

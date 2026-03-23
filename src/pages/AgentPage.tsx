@@ -4,6 +4,7 @@ import { AgentContextManager } from '@/components/agent/AgentContextManager';
 import { Button } from '@/components/ui/button';
 import { MessageBubble, Message } from '@/components/agent/MessageBubble';
 import { ChatInput, ChatInputHandle } from '@/components/agent/ChatInput';
+import { AgentPendingChanges } from '@/components/agent/AgentPendingChanges';
 import { AIModelSelector, AI_MODELS_CONFIG, AIModel } from '@/components/agent/AIModelSelector';
 import { API_URL } from '@/config';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,17 @@ interface ChatSession {
   created_at: Date;
 }
 
+const isComplexPrompt = (prompt: string): boolean => {
+  const complexKeywords = [
+    'pesquis', 'analis', 'cri', 'script', 'lead', 'empresa', 'cnpj', 
+    'linkedin', 'google', 'estratég', 'relatór', 'busqu',
+    'prospec', 'campanh', 'automac', 'encontr', 'verific'
+  ];
+  const lowerPrompt = prompt.toLowerCase();
+  const hasKeyword = complexKeywords.some(keyword => lowerPrompt.includes(keyword));
+  return prompt.length > 25 || hasKeyword;
+};
+
 export default function AgentPage() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -40,7 +52,24 @@ export default function AgentPage() {
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+      
+      // Remove loading messages if any
+      setMessages(prev => prev.filter(m => m.id !== 'loading' && m.id !== 'streaming-res'));
+      
+      toast({
+        title: "Geração interrompida",
+        description: "A IA parou de processar sua solicitação.",
+      });
+    }
+  }, [toast]);
 
   // Keyboard shortcut to toggle sidebar
   useEffect(() => {
@@ -113,9 +142,11 @@ export default function AgentPage() {
         if (!error && data) {
           setMessages(data.map(msg => ({
             id: msg.id,
+            localId: msg.id, // Para mensagens vindas do banco, localId = id
             role: msg.role as 'user' | 'assistant',
             content: msg.content,
-            timestamp: new Date(msg.created_at)
+            timestamp: new Date(msg.created_at),
+            rating: msg.rating // Carregar a curtida do banco
           })));
         }
       } catch (err) {
@@ -173,9 +204,10 @@ export default function AgentPage() {
       }
       setEditingMessageId(null);
     } else {
-      // Fluxo NORMAL (Novo envio)
+      const userMsgId = crypto.randomUUID();
       const userMessage: Message = {
-        id: Date.now().toString(),
+        id: userMsgId,
+        localId: userMsgId,
         role: 'user',
         content: userContent,
         timestamp: new Date(),
@@ -199,6 +231,7 @@ export default function AgentPage() {
 
       if (userSession?.user?.id && currentChatId) {
         supabase.from('agent_messages').insert({
+          id: userMsgId, // FORÇAMOS O ID UUID
           user_id: userSession.user.id,
           chat_id: currentChatId,
           role: 'user',
@@ -207,13 +240,17 @@ export default function AgentPage() {
         }).then();
       }
     }
+    const isComplex = isComplexPrompt(userContent);
+    const assistantMsgId = crypto.randomUUID();
 
     const loadingMessage: Message = {
-      id: 'loading',
+      id: assistantMsgId, // Inicialmente usamos o localId como ID temporário
+      localId: assistantMsgId,
       role: 'assistant',
       content: '',
       timestamp: new Date(),
       isLoading: true,
+      isComplex,
     };
 
     setMessages([...updatedHistory, loadingMessage]);
@@ -221,57 +258,93 @@ export default function AgentPage() {
     try {
       const historyForApi = updatedHistory.slice(-20);
 
+      // Criar novo AbortController para esta requisição
+      abortControllerRef.current = new AbortController();
+
       const response = await fetch(`${API_URL}/api/agent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortControllerRef.current.signal,
         body: JSON.stringify({
           userId: userSession?.user?.id,
+          chatId: currentChatId,
           messages: historyForApi.map((m) => ({ role: m.role, content: m.content })),
           provider: selectedModel.id,
           fileContent: file?.content,
+          assistantMessageId: assistantMsgId
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error || 'Erro ao obter resposta da IA.');
       }
 
-      let replyContent = data.reply;
-      if (data.audio) {
-        replyContent = `${data.reply}\n\n<audio-player src="${data.audio}" />`;
+      // ─── LEITURA DO STREAM (SSE) ──────────────────────────────────────────
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantReply = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6));
+                if (data.part) {
+                  assistantReply += data.part;
+                  
+                  // Re-calcula isComplex dinamicamente se novos logs técnicos surgirem no conteúdo
+                  const currentIsComplex = isComplex || /\[(PLAN|STEP_START|STEP_DONE|PENSANDO|TERMINAL|WEB|SUPABASE|CODE|GIT|PRISMA|BUSCANDO|ANALISANDO|RESEARCH)\]/i.test(assistantReply);
+
+                  // Atualiza a interface em tempo real utilizando o ID fixo
+                  setMessages((prev) => {
+                    return prev.map(m => m.id === assistantMsgId ? {
+                      ...m,
+                      content: assistantReply,
+                      isComplex: currentIsComplex
+                    } : m);
+                  });
+                }
+                if (data.error) throw new Error(data.error);
+              } catch (e) {
+                console.warn('Erro ao parsear chunk:', e);
+              }
+            }
+          }
+        }
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: replyContent,
-        timestamp: new Date(),
-      };
+      // O SALVAMENTO AGORA É FEITO NO BACKEND (MAIS SEGURO)
+      // O frontend apenas aguarda o fim do stream para liberar as ações
+      setIsLoading(false);
+      setMessages(prev => prev.map(m => m.id === assistantMsgId ? { 
+        ...m, 
+        isLoading: false
+      } : m));
 
-      // Salvar resposta da IA no banco
-      if (userSession?.user?.id && currentChatId) {
-        supabase.from('agent_messages').insert({
-          user_id: userSession.user.id,
-          chat_id: currentChatId,
-          role: 'assistant',
-          content: replyContent,
-          provider: data.provider || selectedModel.id
-        }).then();
-      }
-
-      setMessages((prev) => [...prev.filter((m) => m.id !== 'loading'), assistantMessage]);
     } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('[CAPTU AI] Geração cancelada pelo usuário.');
+        return;
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `❌ **Erro:** ${error.message}\n\nTente novamente ou verifique sua conexão.`,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev.filter((m) => m.id !== 'loading'), errorMessage]);
+      setMessages((prev) => [...prev.filter((m) => m.id !== 'loading' && m.id !== 'streaming-res'), errorMessage]);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }, [messages, selectedModel, userSession, activeChatId, editingMessageId]);
 
@@ -424,7 +497,8 @@ export default function AgentPage() {
               onClick={() => setIsContextOpen(true)}
               title="Ajustar Base de Conhecimento (Contexto)"
             >
-              <Brain className="w-4 h-4 text-primary" />
+              
+              <Brain className="w-4 h-4 text-green-500"/>
             </Button>
 
             <AIModelSelector selected={selectedModel} onSelect={setSelectedModel} />
@@ -495,7 +569,7 @@ export default function AgentPage() {
             <>
               {messages.map((message) => (
                 <MessageBubble 
-                  key={message.id} 
+                  key={message.localId || message.id} 
                   message={message} 
                   onEdit={(text) => {
                     setEditingMessageId(message.id);
@@ -512,9 +586,11 @@ export default function AgentPage() {
         </div>
         {/* Input Area */}
         <div className="flex-shrink-0 px-4 pb-6 pt-2">
+          <AgentPendingChanges chatId={activeChatId || ''} isTyping={isLoading} />
           <ChatInput 
             ref={chatInputRef} 
             onSend={sendMessage} 
+            onCancel={stopGeneration}
             isLoading={isLoading} 
             isEditing={!!editingMessageId}
             onCancelEdit={() => setEditingMessageId(null)}

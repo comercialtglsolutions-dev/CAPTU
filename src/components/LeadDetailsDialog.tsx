@@ -1,4 +1,5 @@
-import { useState } from "react";
+/** CAPTU Vibe - Monitoramento Autônomo e Profissional **/
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
