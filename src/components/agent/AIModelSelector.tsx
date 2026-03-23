@@ -29,7 +29,7 @@ export const AI_MODELS_CONFIG: AIModel[] = [
     provider: 'OpenAI',
     icon: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
     description: 'GPT-4o · Mais avançado',
-    isAvailable: false,
+    isAvailable: true,
   },
   {
     id: 'claude',
@@ -70,7 +70,7 @@ export const AI_MODELS_CONFIG: AIModel[] = [
     provider: 'Manus AI',
     icon: 'https://www.google.com/s2/favicons?domain=manus.ai&sz=128',
     description: 'Agente autônomo · Pesquisa',
-    isAvailable: false, // Will be updated by useEffect/backend check
+    isAvailable: false, 
     badge: 'Agent',
   },
 ];
@@ -88,19 +88,23 @@ export function AIModelSelector({ selected, onSelect }: AIModelSelectorProps) {
   useEffect(() => {
     const fetchAvailable = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/agent/available-models`);
+        const res = await fetch(`${API_URL}/api/agent/models`);
         if (!res.ok) return;
         const data = await res.json();
-        const availableIds: string[] = data.available
-          .filter((m: { id: string; available: boolean }) => m.available)
-          .map((m: { id: string; available: boolean }) => m.id);
+        
+        // No novo formato o backend já retorna o array completo em data.models
+        if (data.models && Array.isArray(data.models)) {
+          const availableIds = data.models
+            .filter((m: any) => m.available)
+            .map((m: any) => m.id);
 
-        setModels(AI_MODELS_CONFIG.map((m) => ({
-          ...m,
-          isAvailable: availableIds.includes(m.id),
-        })));
-      } catch {
-        // Fail silently — use defaults
+          setModels(AI_MODELS_CONFIG.map((m) => ({
+            ...m,
+            isAvailable: availableIds.includes(m.id),
+          })));
+        }
+      } catch (err) {
+        console.warn("[AIModelSelector] Erro ao sincronizar modelos:", err);
       }
     };
     fetchAvailable();

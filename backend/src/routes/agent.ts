@@ -4,7 +4,7 @@ import { IntegrationService } from '../services/integrationService.js';
 import { searchLeads } from '../services/googlePlaces.js';
 import { searchLinkedinCompanies } from '../services/linkedinSearch.js';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AgentDevService } from '../services/AgentDevService.js';
+import { AgentDevService } from '../services/agentDevService.js';
 
 const router = express.Router();
 
@@ -123,6 +123,39 @@ async function handleToolCalls(toolCalls: any[], userId: string | undefined, dbC
   }
   return results;
 }
+
+// ─── ENDPOINTS DE CONFIGURAÇÃO ──────────────────────────────────────────────
+router.get('/models', (req, res) => {
+  res.json({
+    models: [
+      { id: 'openai', name: 'OpenAI', description: 'GPT-4o - Mais avançado', available: true },
+      { id: 'gemini', name: 'Gemini', description: 'Gemini 2.0 Flash - Rápido', available: true, isDefault: true },
+      { id: 'claude', name: 'Claude', description: 'Claude 3.5 Sonnet - Textos longos', available: false },
+      { id: 'elevenlabs', name: 'ElevenLabs', description: 'Voz ultra realista - TTS', available: false },
+      { id: 'grok', name: 'Grok', description: 'Tempo real - Em breve', available: false },
+      { id: 'perplexity', name: 'Perplexity', description: 'Pesquisa web - Em breve', available: false },
+      { id: 'manus', name: 'Manus', description: 'Agente autônomo - Pesquisa', available: false },
+    ]
+  });
+});
+
+router.get('/sessions', async (req, res) => {
+  const { userId } = req.query;
+  const { createClient } = await import('@supabase/supabase-js');
+  const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const { data } = await db.from('agent_messages')
+    .select('chat_id, content, timestamp')
+    .eq('user_id', userId)
+    .order('timestamp', { ascending: false });
+  
+  // Agrupar por chat_id (simplificado)
+  const sessions = Array.from(new Set((data || []).map(m => m.chat_id)))
+    .map(cid => {
+      const first = data?.find(m => m.chat_id === cid);
+      return { id: cid, title: first?.content?.substring(0, 30) || 'Novo bate-papo' };
+    });
+  res.json(sessions);
+});
 
 // ─── ENDPOINTS ───────────────────────────────────────────────────────────────
 router.post('/chat', async (req, res) => {
