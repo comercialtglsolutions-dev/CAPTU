@@ -10,12 +10,16 @@ import {
   Globe,
   Settings2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { API_URL } from '@/config';
+import { cn } from '@/lib/utils';
 
 interface ContextItem {
   id: string;
@@ -37,7 +41,90 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
   const [isLoading, setIsLoading] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDistilling, setIsDistilling] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const handleDistill = async () => {
+    if (!userId) return;
+    setIsDistilling(true);
+    try {
+      const res = await fetch(`${API_URL}/api/experience/distill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        toast({ 
+          title: "Novo Padrão Aprendido!", 
+          description: "A IA identificou novos gatilhos de sucesso baseados nos seus feedbacks.",
+        });
+        fetchContext();
+      } else if (data.skip) {
+        toast({ title: "Dados Insuficientes", description: data.message });
+      } else {
+        throw new Error(data.error || 'Falha na destilação');
+      }
+    } catch (error: any) {
+      toast({ title: "Erro na Inteligência", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDistilling(false);
+    }
+  };
+
+  const processFile = async (file: File) => {
+    if (!file || !userId) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userId', userId);
+
+    try {
+      const res = await fetch(`${API_URL}/api/context/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        toast({ title: "Sucesso", description: `Arquivo "${file.name}" processado e adicionado à memória.` });
+        fetchContext();
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Falha no upload');
+      }
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
 
   const fetchContext = async () => {
     if (!userId) return;
@@ -119,33 +206,128 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-8">
           
-          {/* Add URL Section */}
-          <div className="space-y-3">
-            <label className="text-sm font-bold flex items-center gap-2 text-foreground/80">
-              <Globe className="w-4 h-4 text-primary" />
-              Sincronizar Website ou Artigo
-            </label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  placeholder="https://exemplo.com.br/sobre-nos" 
-                  value={newUrl}
-                  onChange={(e) => setNewUrl(e.target.value)}
-                  className="pl-9 bg-secondary/30 border-border/40 h-11 rounded-xl focus:ring-primary/20"
-                />
+          {/* Add URL and File Section - Stacked Layout */}
+          <div className="flex flex-col gap-8">
+            <div className="space-y-3">
+              <label className="text-sm font-bold flex items-center gap-2 text-foreground/80">
+                <Globe className="w-4 h-4 text-primary" />
+                Sincronizar Website ou Artigo
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="https://exemplo.com.br" 
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    className="pl-9 bg-secondary/30 border-border/40 h-11 rounded-xl focus:ring-primary/20"
+                  />
+                </div>
+                <Button 
+                  onClick={handleAddUrl} 
+                  disabled={isAddingUrl || !newUrl}
+                  className="rounded-xl h-11 px-6 shadow-md"
+                >
+                  {isAddingUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar Link"}
+                </Button>
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-bold flex items-center gap-2 text-foreground/80">
+                <FileText className="w-4 h-4 text-primary" />
+                Treinar com Documento Estratégico
+              </label>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                accept=".pdf,.txt,.docx" 
+                className="hidden" 
+              />
               <Button 
-                onClick={handleAddUrl} 
-                disabled={isAddingUrl || !newUrl}
-                className="rounded-xl h-11 px-6 shadow-md"
+                variant="outline"
+                className={cn(
+                  "w-full h-32 rounded-3xl border-dashed border-2 flex flex-col items-center justify-center gap-3 transition-all group",
+                  isDragging 
+                    ? "border-primary/60 bg-primary/5 ring-4 ring-primary/10 scale-[1.02]" 
+                    : "border-border/60 bg-secondary/5 hover:bg-secondary/10 hover:border-primary/40"
+                )}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                disabled={isUploading}
               >
-                {isAddingUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <span className="text-xs font-medium animate-pulse">Processando documento...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                      <Plus className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="font-bold text-sm text-foreground/80">
+                        Clique ou Arraste PDF / DOCX / TXT
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-normal italic">Formato Máximo: 10MB</span>
+                    </div>
+                  </>
+                )}
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground italic px-1">
-              * A IA lerá o conteúdo do site e o usará como base estratégica.
-            </p>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground italic text-center px-4">
+            * A IA analisará o conteúdo (site ou documento) e o usará como base estratégica para todas as interações neste projeto.
+          </p>
+
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-border/40"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-3 text-muted-foreground font-bold tracking-widest flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                Inteligência Evolutiva
+              </span>
+            </div>
+          </div>
+
+          {/* Evolution / Distillation Section */}
+          <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 text-center space-y-4 relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all" />
+            
+            <div className="space-y-2 relative z-10">
+              <div className="flex items-center justify-center gap-2 text-primary font-bold">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+                <span>Auto-Aprendizado</span>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                A IA analisa seus feedbacks positivos e negativos para identificar padrões de sucesso exclusivos do seu negócio.
+              </p>
+            </div>
+
+            <Button 
+              onClick={handleDistill}
+              disabled={isDistilling}
+              className="w-full max-w-xs h-12 rounded-2xl bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-xl shadow-primary/20 border-0 transition-all active:scale-95"
+            >
+              {isDistilling ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Destilando Inteligência...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Brain className="w-4 h-4" />
+                  <span>Sincronizar Aprendizados</span>
+                </div>
+              )}
+            </Button>
           </div>
 
           {/* Current Memory List */}

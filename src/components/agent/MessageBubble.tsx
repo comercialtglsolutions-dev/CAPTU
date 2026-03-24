@@ -28,6 +28,7 @@ export interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  userId: string;
   onEdit?: (text: string) => void;
   onResend?: (text: string) => void;
 }
@@ -208,7 +209,7 @@ function AssistantContent({ message, isComplex, onResend }: { message: Message; 
   );
 }
 
-function MessageActions({ message, onResend }: { message: Message; onResend?: (text: string) => void }) {
+function MessageActions({ message, userId, onResend }: { message: Message; userId: string; onResend?: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const [rating, setRating] = useState<'up' | 'down' | null>(message.rating || null);
 
@@ -235,7 +236,8 @@ function MessageActions({ message, onResend }: { message: Message; onResend?: (t
       // Usamos nosso backend para bypassar restrições de RLS do Supabase
       const response = await axios.post(`${window.location.protocol}//${window.location.hostname}:3000/api/agent/chat/rate`, {
         messageId: message.id,
-        rating: newRating
+        rating: newRating,
+        userId
       });
 
       if (response.status !== 200) throw new Error('Falha na resposta do servidor');
@@ -313,7 +315,7 @@ function MessageActions({ message, onResend }: { message: Message; onResend?: (t
   );
 }
 
-export function MessageBubble({ message, onEdit, onResend }: MessageBubbleProps) {
+export function MessageBubble({ message, userId, onEdit, onResend }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   
@@ -389,7 +391,7 @@ export function MessageBubble({ message, onEdit, onResend }: MessageBubbleProps)
 
         {/* Assistant Actions (Externo à bolha) - Liberado para exibição instantânea */}
         {!isUser && !message.isLoading && (
-          <MessageActions message={message} onResend={onResend} />
+          <MessageActions message={message} userId={userId} onResend={onResend} />
         )}
 
         {/* User Actions */}

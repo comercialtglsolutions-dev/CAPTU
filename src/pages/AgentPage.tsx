@@ -458,11 +458,14 @@ export default function AgentPage() {
       </div>
 
       {/* Main Chat Area - Workspace Wrapper */}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-x-hidden relative bg-background">
+      <div className={cn(
+        "flex-1 flex flex-col h-full min-w-0 overflow-x-hidden relative bg-background transition-all duration-300 ease-in-out",
+        isSidebarOpen ? "lg:pr-[260px]" : "lg:pr-0"
+      )}>
         
         {/* Centered Chat Container */}
         <div className={cn(
-          "flex flex-col h-full mx-auto w-full transition-all duration-500 ease-in-out",
+          "flex flex-col h-full mx-auto w-full transition-all duration-300 ease-in-out",
           messages.some(m => m.content.includes('|') || m.content.includes('<table>')) ? "max-w-7xl" : "max-w-4xl"
         )}>
         
@@ -596,6 +599,7 @@ export default function AgentPage() {
                 <MessageBubble 
                   key={message.localId || message.id} 
                   message={message} 
+                  userId={userSession?.user?.id || ''}
                   onEdit={(text) => {
                     setEditingMessageId(message.id);
                     chatInputRef.current?.setText(text);

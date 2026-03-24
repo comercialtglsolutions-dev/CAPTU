@@ -12,6 +12,7 @@ import webhookRoutes from './routes/webhooks.js';
 import integrationRoutes from './routes/integrations.js';
 import agentRoutes from './routes/agent.js';
 import contextRoutes from './routes/context.js';
+import experienceRoutes from './routes/experience.js';
 import { createTerminalWss } from './routes/terminal.js';
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', integrationRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/context', contextRoutes);
+app.use('/api/experience', experienceRoutes);
 
 // Health check
 app.get('/', (_req, res) => {

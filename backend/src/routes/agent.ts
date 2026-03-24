@@ -410,20 +410,60 @@ router.post('/chat', async (req, res) => {
       if (integ?.is_active && integ.credentials?.apiKey) customKey = integ.credentials.apiKey;
     }
 
-    let captuContext = systemPrompt || `Você é o CAPTU AI, assistente de prospecção B2B. Responda em português. 
-Sempre chame propose_patch para mudanças de código. Artefatos: [ARTIFACT type="proposal" title="..." id="..."] [/ARTIFACT]`;
+    let captuContext = systemPrompt || `Você é o CAPTU AI, uma inteligência de elite em prospecção B2B e estratégia comercial. Sua missão é ser o copiloto estratégico do usuário.
+Responda sempre em português. Priorize clareza, tom profissional e ações que gerem leads reais.
+Sempre que precisar sugerir uma mudança de código ou UI, use o recurso 'propose_patch' para gerar um artefato visual para o usuário.
+Artefatos devem ser gerados assim: [ARTIFACT type="proposal" title="..." id="..."] [/ARTIFACT]`;
 
-    // ─── INJEÇÃO DE CONTEXTO ───
+    // ─── INJEÇÃO DE CONTEXTO PROFUNDO (PERSONALIZAÇÃO) ───
     if (userId) {
       try {
         const { createClient } = await import('@supabase/supabase-js');
         const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-        const [leadsRes, campsRes] = await Promise.all([
+        
+        const [leadsRes, campsRes, customContext] = await Promise.all([
           db.from('leads').select('*', { count: 'exact', head: true }),
-          db.from('campaigns').select('*').limit(3).order('created_at', { ascending: false })
+          db.from('campaigns').select('*').limit(3).order('created_at', { ascending: false }),
+          db.from('tenant_context').select('*').eq('user_id', userId)
         ]);
-        captuContext += `\n\nContexto Projeto: Leads=${leadsRes.count || 0}. Campanhas Recentes: ${(campsRes.data || []).map(c => c.name).join(', ')}`;
-      } catch (e) {}
+
+        // Resumo estatístico
+        captuContext += `\n\n[DADOS DO PROJETO]: Leads Atuais=${leadsRes.count || 0}. Campanhas Recentes: ${(campsRes.data || []).map(c => c.name).join(', ')}.`;
+
+        // Injeção de Memória Personalizada (Padrões e Instruções Pequenas)
+        if (customContext.data && customContext.data.length > 0) {
+          captuContext += `\n\n--- INSTRUÇÕES ESTRATÉGICAS E BASE DE CONHECIMENTO (RESUMO) ---`;
+          customContext.data.forEach((ctx: any) => {
+            // No chat, só injetamos conteúdos curtos (padrões e personas) para não poluir o prompt.
+            // O conteúdo denso (PDFs, URLs longas) será gerido pelo RAG abaixo.
+            if (ctx.type === 'pattern' || ctx.type === 'persona' || ctx.content.length < 1500) {
+              captuContext += `\n[FONTE: ${ctx.name} (${ctx.type})]\n${ctx.content}\n---`;
+            }
+          });
+        }
+
+        // ─── BUSCA SEMÂNTICA RAG (MEMÓRIA PROFUNDA) ───
+        const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop()?.content;
+        if (lastUserMsg) {
+          try {
+            const { EmbeddingService } = await import('../services/embeddings.js');
+            const relevantChunks = await EmbeddingService.searchKnowledge(userId, lastUserMsg);
+            
+            if (relevantChunks && relevantChunks.length > 0) {
+              console.log(`[RAG] Busca semântica retornou ${relevantChunks.length} evidências.`);
+              captuContext += `\n\n--- INFORMAÇÕES RELEVANTES ENCONTRADAS NA BASE DE CONHECIMENTO (RAG) ---\n`;
+              relevantChunks.forEach((chunk: any, idx: number) => {
+                captuContext += `\n[EVIDÊNCIA ${idx+1}]: ${chunk.content}\n---`;
+              });
+              captuContext += `\nAssuma que estas evidências acima são o contexto mais específico para a pergunta atual.\n\n`;
+            }
+          } catch (e: any) {
+            console.error('[RAG] Falha na busca semântica:', e.message);
+          }
+        }
+      } catch (e: any) {
+        console.error('[Context Engine] Falha na injeção:', e.message);
+      }
     }
 
     // SSE Headers
@@ -542,8 +582,12 @@ Sempre chame propose_patch para mudanças de código. Artefatos: [ARTIFACT type=
   }
 });
 
+import { distillExperience } from './experience.js';
+
+// ... (existing imports and code)
+
 router.post('/chat/rate', async (req: any, res: any) => {
-  const { messageId, rating } = req.body;
+  const { messageId, rating, userId } = req.body;
   const { createClient } = await import('@supabase/supabase-js');
   const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   
@@ -551,6 +595,36 @@ router.post('/chat/rate', async (req: any, res: any) => {
     console.log(`[CAPTU DB] Atualizando rating para ${messageId}: ${rating}`);
     const { error } = await db.from('agent_messages').update({ rating }).eq('id', messageId);
     if (error) throw error;
+
+    // ─── ALIMENTAR MOTOR DE EXPERIÊNCIA E APRENDER AUTOMATICAMENTE ───
+    if (rating && (rating === 'up' || rating === 'down')) {
+      const { data: msg } = await db.from('agent_messages').select('content, user_id').eq('id', messageId).single();
+      
+      if (msg) {
+        const targetUserId = msg.user_id || userId;
+        await db.from('agent_experience').insert({
+          user_id: targetUserId,
+          type: 'chat',
+          action_description: `Mensagem da IA: "${msg.content.substring(0, 100)}..."`,
+          outcome: rating === 'up' ? 'success' : 'failure',
+          metadata: { messageId }
+        });
+        console.log(`[Experience] Novo log de ${rating === 'up' ? 'sucesso' : 'falha'} registrado.`);
+
+        // GATILHO AUTOMÁTICO DE APRENDIZADO (Background) - Segurança contra erro 429
+        if (targetUserId) {
+          const { count } = await db.from('agent_experience').select('*', { count: 'exact', head: true }).eq('user_id', targetUserId);
+          
+          if (count && (count % 3 === 0 || count === 1)) {
+            console.log(`[Auto-Learn] Iniciando destilação (Registros: ${count})...`);
+            distillExperience(targetUserId).catch(e => console.error('[Auto-Learn] Erro silencioso:', e.message));
+          } else {
+            console.log(`[Auto-Learn] Experiência registrada (${count}). Próximo aprendizado em ${3 - ((count || 0) % 3)} interações.`);
+          }
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (err: any) {
     console.error('[CAPTU DB] Erro ao atualizar rating:', err.message);
