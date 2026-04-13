@@ -481,7 +481,7 @@ Artefatos devem ser gerados assim: [ARTIFACT type="proposal" title="..." id="...
     if (provider === 'gemini') {
       const activeKey = customKey || GEMINI_API_KEY;
       const genAI = new GoogleGenerativeAI(activeKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: captuContext, tools: [{ functionDeclarations: CAPTU_TOOLS.map(t => t.function) }] as any });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction: captuContext, tools: [{ functionDeclarations: CAPTU_TOOLS.map(t => t.function) }] as any });
       const chat = model.startChat({ history: messages.slice(0, -1).map((m: any) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })) });
       
       let iterations = 0;

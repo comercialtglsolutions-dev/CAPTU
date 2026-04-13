@@ -47,30 +47,34 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     } else if (extension === 'docx' || mime.includes('wordprocessingml')) {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       textContent = result.value;
-    } else if (mime === 'text/plain' || extension === 'txt') {
+    } else if (mime === 'text/plain' || mime === 'text/csv' || extension === 'txt' || extension === 'csv') {
       textContent = file.buffer.toString('utf-8');
     } else {
       console.warn(`[Context] Unsuported format: MIME=${mime}, Ext=${extension}`);
-      return res.status(400).json({ error: 'Formato não suportado. Use PDF, DOCX ou TXT.' });
+      return res.status(400).json({ error: 'Formato não suportado. Use PDF, DOCX, TXT ou CSV.' });
     }
 
     if (!textContent.trim()) {
       return res.status(400).json({ error: 'O arquivo parece estar vazio ou não pôde ser lido.' });
     }
 
+    const categoryInfo = await EmbeddingService.autoCategorize(textContent);
+
     const { data: inserted, error } = await supabase.from('tenant_context').insert({
       user_id: userId,
       type: 'file',
       name: fileName,
       content: textContent,
-      source_url: null
+      source_url: null,
+      categoria: categoryInfo.categoria,
+      peso_prioridade: categoryInfo.peso_prioridade
     }).select().single();
 
     if (error) throw error;
 
     // ─── VETORIZAÇÃO RAG (ASSÍNCRONA) ───
     if (inserted) {
-      EmbeddingService.vectorizeContext(userId, inserted.id, textContent, fileName)
+      EmbeddingService.vectorizeContext(userId, inserted.id, textContent, fileName, categoryInfo)
         .catch(e => console.error('[RAG] Erro no upload:', e.message));
     }
 
@@ -107,19 +111,23 @@ router.post('/add-url', async (req, res) => {
       .replace(/\s+/g, ' ')
       .trim();
                             
+    const categoryInfo = await EmbeddingService.autoCategorize(textContent);
+
     const { data: inserted, error } = await supabase.from('tenant_context').insert({
       user_id: userId,
       type: 'url',
       name: name || url.replace(/^https?:\/\//, '').split('/')[0],
       content: textContent.substring(0, 40000), // Captura até 40k caracteres
-      source_url: url
+      source_url: url,
+      categoria: categoryInfo.categoria,
+      peso_prioridade: categoryInfo.peso_prioridade
     }).select().single();
 
     if (error) throw error;
 
     // ─── VETORIZAÇÃO RAG (ASSÍNCRONA) ───
     if (inserted) {
-      EmbeddingService.vectorizeContext(userId, inserted.id, textContent, inserted.name)
+      EmbeddingService.vectorizeContext(userId, inserted.id, textContent, inserted.name, categoryInfo)
         .catch(e => console.error('[RAG] Erro na URL:', e.message));
     }
 
@@ -135,18 +143,22 @@ router.post('/add-text', async (req, res) => {
   const { userId, name, content, type = 'text' } = req.body;
   if (!userId || !content) return res.status(400).json({ error: 'UserID and Content are required' });
 
+  const categoryInfo = await EmbeddingService.autoCategorize(content);
+
   const { data: inserted, error } = await supabase.from('tenant_context').insert({
     user_id: userId,
     type: type, // 'file', 'text' ou 'persona'
     name: name || 'Nota Estratégica',
-    content: content
+    content: content,
+    categoria: categoryInfo.categoria,
+    peso_prioridade: categoryInfo.peso_prioridade
   }).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
 
   // ─── VETORIZAÇÃO RAG (ASSÍNCRONA) ───
   if (inserted) {
-    EmbeddingService.vectorizeContext(userId, inserted.id, content, inserted.name)
+    EmbeddingService.vectorizeContext(userId, inserted.id, content, inserted.name, categoryInfo)
       .catch(e => console.error('[RAG] Erro no texto:', e.message));
   }
 

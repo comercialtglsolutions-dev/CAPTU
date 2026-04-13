@@ -526,7 +526,7 @@ export default function AgentPage() {
               title="Ajustar Base de Conhecimento (Contexto)"
             >
               
-              <Brain className="w-4 h-4 text-muted-foreground"/>
+              <Brain className="w-4 h-4 text-green-500"/>
             </Button>
 
             <AIModelSelector selected={selectedModel} onSelect={setSelectedModel} />

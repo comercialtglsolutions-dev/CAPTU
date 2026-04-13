@@ -28,6 +28,8 @@ interface ContextItem {
   content: string;
   source_url?: string;
   created_at: string;
+  categoria?: string;
+  peso_prioridade?: number;
 }
 
 interface AgentContextManagerProps {
@@ -44,8 +46,11 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
   const [isUploading, setIsUploading] = useState(false);
   const [isDistilling, setIsDistilling] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>("Todas");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const CATEGORIES = ["Todas", "Comportamento Humano", "Cultura e Marca", "Operacional", "Produto Técnico", "Inteligência de Mercado", "Compliance", "Troubleshooting"];
 
   const handleDistill = async () => {
     if (!userId) return;
@@ -242,7 +247,7 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileUpload} 
-                accept=".pdf,.txt,.docx" 
+                accept=".pdf,.txt,.docx,.csv" 
                 className="hidden" 
               />
               <Button 
@@ -271,7 +276,7 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <div className="font-bold text-sm text-foreground/80">
-                        Clique ou Arraste PDF / DOCX / TXT
+                        Clique ou Arraste PDF / DOCX / TXT / CSV
                       </div>
                       <span className="text-[10px] text-muted-foreground font-normal italic">Formato Máximo: 10MB</span>
                     </div>
@@ -332,14 +337,45 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
 
           {/* Current Memory List */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-foreground/80 flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-primary" />
-                Conhecimento Ativo
-              </label>
-              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                {items.length} itens
-              </span>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-foreground/80 flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-primary" />
+                  Conhecimento Ativo
+                </label>
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                  {items.length} itens
+                </span>
+              </div>
+
+              {/* Menu Horizontal de Categorias (Sempre visível) */}
+              <div className="flex gap-2 w-full overflow-x-auto pb-3 pt-1 px-1 
+                [&::-webkit-scrollbar]:h-1.5 
+                [&::-webkit-scrollbar-track]:bg-secondary/20 
+                [&::-webkit-scrollbar-track]:rounded-full
+                [&::-webkit-scrollbar-thumb]:bg-border/60 
+                hover:[&::-webkit-scrollbar-thumb]:bg-primary/60 
+                [&::-webkit-scrollbar-thumb]:rounded-full 
+                transition-all">
+                {CATEGORIES.map(cat => {
+                  const count = cat === "Todas" ? items.length : items.filter(i => i.categoria === cat).length;
+                  
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border",
+                        activeCategory === cat 
+                          ? "bg-primary text-primary-foreground border-primary shadow-md"
+                          : "bg-secondary/20 text-muted-foreground hover:bg-secondary/60 border-border/40"
+                      )}
+                    >
+                      {cat} <span className="opacity-70 ml-1">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -348,35 +384,58 @@ export function AgentContextManager({ userId, isOpen, onClose }: AgentContextMan
                   <Loader2 className="w-8 h-8 animate-spin" />
                   <span className="text-xs">Acessando memória...</span>
                 </div>
-              ) : items.length === 0 ? (
+              ) : items.length === 0 && activeCategory === "Todas" ? (
                 <div className="py-10 border border-dashed border-border/40 rounded-2xl flex flex-col items-center justify-center gap-3 bg-secondary/5 text-muted-foreground">
                   <AlertCircle className="w-8 h-8 opacity-20" />
                   <p className="text-sm">A IA ainda não possui contexto personalizado.</p>
                 </div>
+              ) : items.filter(item => activeCategory === "Todas" || item.categoria === activeCategory).length === 0 ? (
+                <div className="py-10 border border-dashed border-border/40 rounded-2xl flex flex-col items-center justify-center gap-3 bg-secondary/5 text-muted-foreground">
+                  <AlertCircle className="w-8 h-8 opacity-20" />
+                  <p className="text-sm">Nenhum contexto encontrado na categoria "{activeCategory}".</p>
+                </div>
               ) : (
-                items.map((item) => (
+                items
+                  .filter(item => activeCategory === "Todas" || item.categoria === activeCategory)
+                  .map((item) => (
                   <div 
                     key={item.id} 
-                    className="group flex items-center justify-between p-4 bg-secondary/20 hover:bg-secondary/40 border border-border/30 rounded-2xl transition-all"
+                    className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-secondary/20 hover:bg-secondary/40 border border-border/30 rounded-2xl transition-all gap-4"
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-background border border-border/40 flex items-center justify-center shrink-0">
                         {item.type === 'url' ? <Globe className="w-4 h-4 text-blue-500" /> : <FileText className="w-4 h-4 text-orange-500" />}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-semibold truncate text-foreground">{item.name}</h4>
+                        <h4 className="text-sm font-semibold truncate text-foreground flex items-center gap-2">
+                          {item.name}
+                          {item.categoria && <Sparkles className="w-3 h-3 text-primary" />}
+                        </h4>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          Contexto ativo para prospecção
+                          Contexto ativo para IA
                         </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    
+                    <div className="flex items-center gap-3 shrink-0">
+                      {item.categoria && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-md">
+                            {item.categoria}
+                          </span>
+                          <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-md">
+                            Peso {item.peso_prioridade || 3}
+                          </span>
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => handleDelete(item.id)}
+                        className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
