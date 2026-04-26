@@ -67,24 +67,6 @@ export default function LoginPage() {
         }
     };
 
-    const handleMicrosoftLogin = async () => {
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: "azure",
-                options: {
-                    redirectTo: `${window.location.origin}/`,
-                },
-            });
-
-            if (error) throw error;
-        } catch (error: any) {
-            toast({
-                title: "Erro ao fazer login com Microsoft",
-                description: error.message,
-                variant: "destructive",
-            });
-        }
-    };
 
     return (
         <div className="min-h-screen flex">
@@ -179,22 +161,6 @@ export default function LoginPage() {
                         <div className="space-y-3">
                             <Button
                                 type="button"
-                                onClick={handleMicrosoftLogin}
-                                variant="outline"
-                                className="w-[340px] h-12 bg-white hover:bg-gray-100 hover:text-gray-900 text-gray-900 border-0 font-medium transition-colors"
-                            >
-                                <svg className="mr-2 h-5 w-5" viewBox="0 0 23 23">
-                                    <path fill="#f3f3f3" d="M0 0h23v23H0z" />
-                                    <path fill="#f35325" d="M1 1h10v10H1z" />
-                                    <path fill="#81bc06" d="M12 1h10v10H12z" />
-                                    <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                                    <path fill="#ffba08" d="M12 12h10v10H12z" />
-                                </svg>
-                                Entrar com Microsoft
-                            </Button>
-
-                            <Button
-                                type="button"
                                 onClick={handleGoogleLogin}
                                 variant="outline"
                                 className="w-[340px] h-12 bg-white hover:bg-gray-100 hover:text-gray-900 text-gray-900 border-0 font-medium transition-colors"
@@ -222,7 +188,7 @@ export default function LoginPage() {
                         </div>
                     </form>
                     
-                    <div className="pt-8 flex justify-center gap-6 text-xs text-gray-500 font-medium">
+                    <div className="pt-8 w-[340px] flex justify-center gap-6 text-xs text-gray-500 font-medium">
                         <Link to="/terms-service" className="hover:text-primary transition-colors">Termos de Serviço</Link>
                         <Link to="/privacy" className="hover:text-primary transition-colors">Aviso de Privacidade</Link>
                     </div>
