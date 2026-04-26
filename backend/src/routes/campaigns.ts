@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
+console.log('✅ [Campaigns] Roteador carregado com sucesso!');
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -311,5 +312,100 @@ router.delete('/:id/leads', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+/**
+ * POST /api/campaigns/track-reply
+ * Registra uma resposta recebida e atualiza as estatísticas da campanha.
+ */
+router.post('/track-reply', async (req, res) => {
+    if (!supabase) return res.status(500).json({ error: 'Supabase client not initialized' });
+    const { phone, message } = req.body;
+
+    if (!phone) return res.status(400).json({ error: 'Phone is required' });
+
+    try {
+        // 1. Limpar o número para buscar no banco
+        // Remove @s.whatsapp.net e qualquer caractere não numérico
+        const cleanPhone = phone.split('@')[0].replace(/\D/g, '');
+        
+        // No Brasil, os últimos 8 dígitos são o número base e são os mais confiáveis
+        const searchNumber = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone;
+
+        console.log(`[TrackReply] Incoming: ${phone}, Clean: ${cleanPhone}, Searching for: ${searchNumber}`);
+
+        // 2. Buscar o lead pelo telefone usando busca parcial (LIKE)
+        // Buscamos leads cujo telefone contenha os últimos 8 dígitos
+        const { data: leads, error: leadError } = await supabase
+            .from('leads')
+            .select('id, name, phone')
+            .or(`phone.ilike.%${searchNumber}%,phone.ilike.%${cleanPhone}%`)
+            .limit(1);
+
+        if (leadError || !leads || leads.length === 0) {
+            console.log(`[TrackReply] Lead NOT found for: ${searchNumber}`);
+            return res.status(404).json({ error: 'Lead not found for this phone. Certifique-se de que o lead está cadastrado com DDD.' });
+        }
+
+        const lead = leads[0];
+
+        // 3. Buscar a campanha mais recente onde este lead foi "enviado" mas não "respondido"
+        const { data: campaignLeads, error: clError } = await supabase
+            .from('campaign_leads')
+            .select('campaign_id, status')
+            .eq('lead_id', lead.id)
+            .eq('status', 'sent')
+            .order('sent_at', { ascending: false })
+            .limit(1);
+
+        if (clError || !campaignLeads || campaignLeads.length === 0) {
+            await recordHistory(lead.id, message);
+            return res.json({ success: true, message: 'Response recorded in history only' });
+        }
+
+        const campaignId = campaignLeads[0].campaign_id;
+
+        // 4. Atualizar o status para 'replied'
+        await supabase
+            .from('campaign_leads')
+            .update({ status: 'replied' })
+            .eq('campaign_id', campaignId)
+            .eq('lead_id', lead.id);
+
+        // 5. Incrementar o contador de respostas da campanha
+        const { data: campaign } = await supabase
+            .from('campaigns')
+            .select('response_count')
+            .eq('id', campaignId)
+            .single();
+
+        await supabase
+            .from('campaigns')
+            .update({ response_count: (campaign?.response_count || 0) + 1 })
+            .eq('id', campaignId);
+
+        // 6. Registrar no histórico
+        await recordHistory(lead.id, message);
+
+        res.json({ success: true, message: 'Reply tracked successfully' });
+
+    } catch (error: any) {
+        console.error('Error tracking reply:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+async function recordHistory(leadId: string, message: string) {
+    if (!supabase) return;
+    await supabase
+        .from('contact_history')
+        .insert({
+            company_id: leadId,
+            type: 'whatsapp',
+            message: message,
+            status: 'received',
+            direction: 'inbound',
+            data_envio: new Date().toISOString()
+        });
+}
 
 export default router;

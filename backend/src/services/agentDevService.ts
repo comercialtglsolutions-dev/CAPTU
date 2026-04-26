@@ -64,6 +64,16 @@ export class AgentDevService {
       const child = spawn(shell, [shellFlag, command], {
         cwd: PROJECT_ROOT,
         windowsHide: true,
+        env: { 
+          ...process.env, 
+          PYTHONIOENCODING: 'utf-8',
+          PYTHONUNBUFFERED: '1',
+          TERM: 'dumb',
+          HERMES_QUIET: '1',
+          HERMES_HIDE_BANNER: '1',
+          LANG: 'pt_BR.UTF-8',
+          LC_ALL: 'pt_BR.UTF-8'
+        }
       });
 
       const handleLine = (data: Buffer, isStderr: boolean) => {

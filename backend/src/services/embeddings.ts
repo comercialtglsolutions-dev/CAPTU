@@ -115,10 +115,10 @@ ${sample}`;
     // TENTATIVA 1: GEMINI (768 dimensões nativas)
     try {
       if (process.env.GEMINI_API_KEY) {
-        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+        const model = genAI.getGenerativeModel({ model: "embedding-001" });
         const result = await model.embedContent(text);
         if (result.embedding.values.length > 0) {
-          console.log('[RAG] Vetor gerado com sucesso via Gemini.');
+          console.log('[RAG] Vetor gerado com sucesso via Gemini (embedding-001).');
           return result.embedding.values;
         }
       }

@@ -394,6 +394,7 @@ router.get('/available-models', (_req, res) => {
       { id: 'claude', available: !!ANTHROPIC_API_KEY },
       { id: 'elevenlabs', available: !!ELEVENLABS_API_KEY },
       { id: 'manus', available: !!MANUS_API_KEY },
+      { id: 'hermes', available: true },
     ]
   });
 });
@@ -421,44 +422,46 @@ Artefatos devem ser gerados assim: [ARTIFACT type="proposal" title="..." id="...
         const { createClient } = await import('@supabase/supabase-js');
         const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
         
-        const [leadsRes, campsRes, customContext] = await Promise.all([
-          db.from('leads').select('*', { count: 'exact', head: true }),
-          db.from('campaigns').select('*').limit(3).order('created_at', { ascending: false }),
-          db.from('tenant_context').select('*').eq('user_id', userId)
-        ]);
+        // ─── LÓGICA DE RAG DINÂMICO ───
+        if (provider === 'hermes') {
+          // Para o Hermes (Motor Local), o RAG é "Agêntico". 
+          // Sincronizamos a base para arquivos Markdown e dizemos para ele ler a pasta.
+          const { KnowledgeSyncService } = await import('../services/knowledgeSyncService.js');
+          await KnowledgeSyncService.syncToLocal(userId);
 
-        // Resumo estatístico
-        captuContext += `\n\n[DADOS DO PROJETO]: Leads Atuais=${leadsRes.count || 0}. Campanhas Recentes: ${(campsRes.data || []).map(c => c.name).join(', ')}.`;
+          captuContext += `\n\n[SISTEMA DE CONHECIMENTO AGÊNTICO]:
+Você tem acesso direto à base de conhecimento do projeto em tempo real.
+Seus arquivos de contexto (Playbooks, Scripts, Leads) estão na pasta './knowledge'.
+Sempre que precisar consultar informações específicas, roteiros ou dados do projeto, USE a ferramenta 'search_files' ou 'read_file' na pasta './knowledge' ANTES de responder. 
+Não invente dados se os arquivos estiverem disponíveis.`;
+          
+        } else {
+          // Para motores em nuvem (Gemini/OpenAI), usamos busca semântica tradicional (RAG).
+          const [leadsRes, campsRes, customContext] = await Promise.all([
+            db.from('leads').select('*', { count: 'exact', head: true }),
+            db.from('campaigns').select('*').limit(3).order('created_at', { ascending: false }),
+            db.from('tenant_context').select('*').eq('user_id', userId)
+          ]);
 
-        // Injeção de Memória Personalizada (Padrões e Instruções Pequenas)
-        if (customContext.data && customContext.data.length > 0) {
-          captuContext += `\n\n--- INSTRUÇÕES ESTRATÉGICAS E BASE DE CONHECIMENTO (RESUMO) ---`;
-          customContext.data.forEach((ctx: any) => {
-            // No chat, só injetamos conteúdos curtos (padrões e personas) para não poluir o prompt.
-            // O conteúdo denso (PDFs, URLs longas) será gerido pelo RAG abaixo.
-            if (ctx.type === 'pattern' || ctx.type === 'persona' || ctx.content.length < 1500) {
-              captuContext += `\n[FONTE: ${ctx.name} (${ctx.type})]\n${ctx.content}\n---`;
+          captuContext += `\n\n[DADOS DO PROJETO]: Leads Atuais=${leadsRes.count || 0}. Campanhas Recentes: ${(campsRes.data || []).map(c => c.name).join(', ')}.`;
+
+          const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop()?.content;
+          if (lastUserMsg) {
+            try {
+              const { EmbeddingService } = await import('../services/embeddings.js');
+              const relevantChunks = await EmbeddingService.searchKnowledge(userId, lastUserMsg);
+              
+              if (relevantChunks && relevantChunks.length > 0) {
+                console.log(`[RAG] Busca semântica retornou ${relevantChunks.length} evidências.`);
+                captuContext += `\n\n--- INFORMAÇÕES RELEVANTES ENCONTRADAS NA BASE DE CONHECIMENTO (RAG) ---\n`;
+                relevantChunks.forEach((chunk: any, idx: number) => {
+                  captuContext += `\n[EVIDÊNCIA ${idx+1}]: ${chunk.content}\n---`;
+                });
+                captuContext += `\nAssuma que estas evidências acima são o contexto mais específico para a pergunta atual.\n\n`;
+              }
+            } catch (e: any) {
+              console.error('[RAG] Falha na busca semântica:', e.message);
             }
-          });
-        }
-
-        // ─── BUSCA SEMÂNTICA RAG (MEMÓRIA PROFUNDA) ───
-        const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop()?.content;
-        if (lastUserMsg) {
-          try {
-            const { EmbeddingService } = await import('../services/embeddings.js');
-            const relevantChunks = await EmbeddingService.searchKnowledge(userId, lastUserMsg);
-            
-            if (relevantChunks && relevantChunks.length > 0) {
-              console.log(`[RAG] Busca semântica retornou ${relevantChunks.length} evidências.`);
-              captuContext += `\n\n--- INFORMAÇÕES RELEVANTES ENCONTRADAS NA BASE DE CONHECIMENTO (RAG) ---\n`;
-              relevantChunks.forEach((chunk: any, idx: number) => {
-                captuContext += `\n[EVIDÊNCIA ${idx+1}]: ${chunk.content}\n---`;
-              });
-              captuContext += `\nAssuma que estas evidências acima são o contexto mais específico para a pergunta atual.\n\n`;
-            }
-          } catch (e: any) {
-            console.error('[RAG] Falha na busca semântica:', e.message);
           }
         }
       } catch (e: any) {
@@ -478,7 +481,37 @@ Artefatos devem ser gerados assim: [ARTIFACT type="proposal" title="..." id="...
     let assistantReply = "";
 
     // ─── STREAMING FLOWS ───
-    if (provider === 'gemini') {
+    if (provider === 'hermes') {
+      const lastMsg = messages[messages.length - 1].content;
+      // --continue é melhor que --resume pois cria a sessão se não existir
+      // HERMES_QUIET=1 silencia logs de inicialização internos
+      const hermesCommand = `hermes --continue "CAPTU-${chatId || 'default'}" chat -q "${lastMsg.replace(/"/g, '\\"')}" --yolo`;
+      
+      let isCapturing = false;
+      
+      try {
+        await AgentDevService.executeCommandStream(hermesCommand, (line) => {
+          // LÓGICA DE FILTRAGEM: O Hermes solta banner e logs de ferramentas.
+          // Queremos apenas o texto balanceado entre as bordas do chat.
+          const cleanLine = line.trim();
+          
+          if (cleanLine.includes('⚕ Hermes')) { isCapturing = true; return; }
+          if (isCapturing && cleanLine.startsWith('────')) { isCapturing = false; return; }
+          
+          if (isCapturing && cleanLine) {
+            assistantReply += line + '\n';
+            sendChunk({ part: line + '\n' });
+          }
+        });
+
+        if (!assistantReply.trim()) {
+           // Fallback caso a filtragem falhe ou o Hermes não use bordas (versão CLI pura)
+           sendChunk({ part: '\n[Motor Hermes respondeu, mas o formato foi inesperado. Verifique os logs.]\n' });
+        }
+      } catch (e: any) {
+        throw new Error(`Erro ao invocar Hermes: ${e.message}`);
+      }
+    } else if (provider === 'gemini') {
       const activeKey = customKey || GEMINI_API_KEY;
       const genAI = new GoogleGenerativeAI(activeKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction: captuContext, tools: [{ functionDeclarations: CAPTU_TOOLS.map(t => t.function) }] as any });
