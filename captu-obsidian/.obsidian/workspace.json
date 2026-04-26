@@ -1,0 +1,224 @@
+{
+  "main": {
+    "id": "f415c6537ea7a5ce",
+    "type": "split",
+    "children": [
+      {
+        "id": "de049351ab9cc037",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "838e3c8dc878806c",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Visualização em gráfico"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "0c16f0b8582807e7",
+    "type": "split",
+    "children": [
+      {
+        "id": "3d91b0d2e573aee4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4f0ab0a5046d7d59",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": true
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "c78100b17fd305ff",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "0609a2f6a8608aaf",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "755ee7d36f939738",
+    "type": "split",
+    "children": [
+      {
+        "id": "3ed5409dc8cf907e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ca01c1f78788cb12",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "02_Comportamento_Humano/Index.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para Index"
+            }
+          },
+          {
+            "id": "cc2352b6ed436ea8",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "02_Comportamento_Humano/Index.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para Index"
+            }
+          },
+          {
+            "id": "e85e1d3b9c767469",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "947cbdc694053912",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "472e369c8714f53f",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "02_Comportamento_Humano/Index.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de Index"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "838e3c8dc878806c",
+  "lastOpenFiles": [
+    "00_Dashboard.md",
+    "Sem título",
+    "2026-04-13.md",
+    "Instrucoes_Para_o_Claude.md",
+    "Manifesto e Posicionamento.md",
+    "Sem título.base",
+    "Sem título.canvas",
+    "Sem título 1.base",
+    "Sem título 1.canvas",
+    "Sem título 2.canvas",
+    "04_Produto_Tecnico/Index.md",
+    "05_Inteligencia_de_Mercado/Index.md",
+    "08_Brain_CAPTU/Contextos/vibe_coding_functional_specs.md",
+    "08_Brain_CAPTU/Sessoes_Recentes.md",
+    "08_Brain_CAPTU/Contextos/analise_docs_contexto_captu.md",
+    "08_Brain_CAPTU/Contextos/bluetooth_strategy.md",
+    "08_Brain_CAPTU/Contextos/captu_n8n_integration_guide.md",
+    "08_Brain_CAPTU/Contextos/crossplatform_health_strategy.md",
+    "08_Brain_CAPTU/Contextos/estrategia_checkout_hotmart.md",
+    "08_Brain_CAPTU/Contextos/estrategia_checkout_login.md",
+    "08_Brain_CAPTU/Contextos/estrategia_migracao_obsidian.md",
+    "08_Brain_CAPTU/Contextos/estrategia_passo_identificacao.md",
+    "08_Brain_CAPTU/Contextos/google_login_fix_plan.md",
+    "08_Brain_CAPTU/Contextos/implementation_plan_emoji_attachments.md",
+    "08_Brain_CAPTU/Contextos/scratchpad_2pof90dy.md",
+    "08_Brain_CAPTU/Contextos/scratchpad_7w69whd5.md",
+    "08_Brain_CAPTU/Contextos/scratchpad_9p1er7sk.md",
+    "08_Brain_CAPTU/Contextos/scratchpad_43aone2a.md",
+    "08_Brain_CAPTU/Contextos/scratchpad_b8y1nn85.md",
+    "02_Comportamento_Humano/Index.md",
+    "03_Operacional/Guia_de_Cadencia_SDR.md",
+    "02_Comportamento_Humano/Fundamentos_Decisao_B2B.md",
+    "Scripts/sync_to_brain.ts",
+    "Scripts",
+    "07_Troubleshooting",
+    "06_Compliance",
+    "05_Inteligencia_de_Mercado",
+    "04_Produto_Tecnico",
+    "03_Operacional"
+  ]
+}

@@ -312,4 +312,101 @@ router.delete('/:id/leads', async (req, res) => {
     }
 });
 
+/**
+ * Helper: Registra no histórico de contatos (inbound)
+ */
+async function recordHistory(leadId: string, message: string) {
+    if (!supabase) return;
+    const { data: existingChat } = await supabase
+        .from('contact_history')
+        .select('id')
+        .eq('company_id', leadId)
+        .eq('message', message)
+        .gte('data_envio', new Date(Date.now() - 30 * 1000).toISOString())
+        .limit(1);
+
+    if (!existingChat || existingChat.length === 0) {
+        await supabase
+            .from('contact_history')
+            .insert({
+                company_id: leadId,
+                type: 'whatsapp',
+                message: message,
+                status: 'received',
+                direction: 'inbound',
+                data_envio: new Date().toISOString()
+            });
+    }
+}
+
+/**
+ * POST /api/campaigns/track-reply
+ * Registra uma resposta recebida e atualiza as estatísticas da campanha.
+ */
+router.post('/track-reply', async (req, res) => {
+    if (!supabase) return res.status(500).json({ error: 'Supabase client not initialized' });
+    const { phone, message } = req.body;
+
+    if (!phone) return res.status(400).json({ error: 'Phone is required' });
+
+    try {
+        const cleanPhone = phone.split('@')[0].replace(/\D/g, '');
+        const searchNumber = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone;
+
+        console.log(`[TrackReply] Incoming: ${phone}, Clean: ${cleanPhone}, Searching for: ${searchNumber}`);
+
+        const { data: leads, error: leadError } = await supabase
+            .from('leads')
+            .select('id, name, phone')
+            .or(`phone.ilike.%${searchNumber}%,phone.ilike.%${cleanPhone}%`)
+            .limit(1);
+
+        if (leadError || !leads || leads.length === 0) {
+            console.log(`[TrackReply] Lead NOT found for: ${searchNumber}`);
+            return res.status(404).json({ error: 'Lead not found for this phone. Certifique-se de que o lead está cadastrado com DDD.' });
+        }
+
+        const lead = leads[0];
+
+        const { data: campaignLeads, error: clError } = await supabase
+            .from('campaign_leads')
+            .select('campaign_id, status')
+            .eq('lead_id', lead.id)
+            .eq('status', 'sent')
+            .order('sent_at', { ascending: false })
+            .limit(1);
+
+        if (clError || !campaignLeads || campaignLeads.length === 0) {
+            await recordHistory(lead.id, message);
+            return res.json({ success: true, message: 'Response recorded in history only' });
+        }
+
+        const campaignId = campaignLeads[0].campaign_id;
+
+        await supabase
+            .from('campaign_leads')
+            .update({ status: 'replied' })
+            .eq('campaign_id', campaignId)
+            .eq('lead_id', lead.id);
+
+        const { data: campaign } = await supabase
+            .from('campaigns')
+            .select('response_count')
+            .eq('id', campaignId)
+            .single();
+
+        await supabase
+            .from('campaigns')
+            .update({ response_count: (campaign?.response_count || 0) + 1 })
+            .eq('id', campaignId);
+
+        await recordHistory(lead.id, message);
+
+        res.json({ success: true, message: 'Reply tracked successfully' });
+    } catch (error: any) {
+        console.error('Error tracking reply:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
