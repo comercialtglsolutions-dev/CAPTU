@@ -73,6 +73,15 @@ export const AI_MODELS_CONFIG: AIModel[] = [
     isAvailable: false, // Will be updated by useEffect/backend check
     badge: 'Agent',
   },
+  {
+    id: 'hermes',
+    name: 'Hermes',
+    provider: 'Local Agent',
+    icon: 'https://hermes-agent.nousresearch.com/docs/img/logo.png',
+    description: 'IA Gratuita com Memória · Local',
+    isAvailable: true,
+    badge: 'Local',
+  },
 ];
 
 interface AIModelSelectorProps {
