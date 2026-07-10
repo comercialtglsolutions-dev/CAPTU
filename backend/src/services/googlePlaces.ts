@@ -1,7 +1,5 @@
-import axios from 'axios';
+import puppeteer from 'puppeteer';
 import { calculateScore, LeadData } from './leadScoring.js';
-
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
 interface SearchFilters {
     radius?: number;
@@ -12,81 +10,100 @@ interface SearchFilters {
 }
 
 export const searchLeads = async (query: string, city: string, filters: SearchFilters = {}) => {
-    if (!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY === 'SUA_CHAVE_AQUI') {
-        console.warn('Google Places API Key not configured. Returning mock data.');
-        return getMockLeads(query, city);
-    }
-
+    console.log(`[Google Maps Scraper] Iniciando busca via Puppeteer: "${query} em ${city}"`);
+    
+    let browser;
     try {
-        // 1. Converte cidade para lat/lng via Geocoding
-        const geoResponse = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json`, {
-            params: {
-                address: city,
-                key: GOOGLE_PLACES_API_KEY
-            }
+        browser = await puppeteer.launch({
+            headless: true,
+            executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,800']
         });
-
-        if (geoResponse.data.status !== 'OK') {
-            throw new Error('City not found');
-        }
-
-        const { lat, lng } = geoResponse.data.results[0].geometry.location;
-
-        // 2. Consulta Places API (Text Search) com raio personalizado
-        const searchRadius = filters.radius || 10000; // padrão 10km
-        const placesResponse = await axios.get(`https://maps.googleapis.com/maps/api/place/textsearch/json`, {
-            params: {
-                query: `${query} em ${city}`,
-                location: `${lat},${lng}`,
-                radius: searchRadius,
-                key: GOOGLE_PLACES_API_KEY
-            }
+        
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 800 });
+        
+        // Disfarça como usuário real
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
+        
+        const searchQuery = encodeURIComponent(`${query} em ${city}`);
+        const url = `https://www.google.com/maps/search/${searchQuery}`;
+        
+        console.log(`[Google Maps Scraper] Acessando URL: ${url}`);
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        
+        // Espera o container principal carregar
+        await page.waitForSelector('div[role="feed"]', { timeout: 15000 }).catch(() => {
+            console.log('[Google Maps Scraper] Feed role not found immediately, wait a bit longer...');
         });
+        
+        // Faz o scroll e extrai os links básicos (href) usando string literal para evitar conflito de compilação TSX (__name)
+        const links = await page.evaluate(`(async () => {
+            const delay = (ms) => new Promise(res => setTimeout(res, ms));
+            const feed = document.querySelector('div[role="feed"]');
+            
+            if (feed) {
+                for (let i = 0; i < 3; i++) {
+                    feed.scrollTop = feed.scrollHeight;
+                    await delay(1500); 
+                }
+            }
 
-        const results = placesResponse.data.results;
+            const items = Array.from(document.querySelectorAll('a[href*="/maps/place/"]'));
+            const uniqueUrls = new Set();
+            items.forEach(a => uniqueUrls.add(a.href));
+            
+            return Array.from(uniqueUrls).slice(0, 10); 
+        })()`);
 
-        // 3. Busca detalhes para cada lugar (especialmente o website)
-        // Limitamos a 20 resultados para evitar lentidão e custos excessivos
-        const detailedLeads = await Promise.all(
-            results.slice(0, 20).map(async (place: any) => {
-                try {
-                    const detailsResponse = await axios.get(`https://maps.googleapis.com/maps/api/place/details/json`, {
-                        params: {
-                            place_id: place.place_id,
-                            fields: 'name,formatted_phone_number,website,rating,user_ratings_total,types,address_components,formatted_address,photos',
-                            key: GOOGLE_PLACES_API_KEY
+        console.log(`[Google Maps Scraper] Encontrados ${(links as any).length} perfis. Extraindo detalhes...`);
+
+        const detailedLeads: any[] = [];
+
+        // Visita cada perfil rapidamente para extrair os detalhes ricos
+        for (const link of (links as any)) {
+            try {
+                await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 10000 });
+                await page.waitForSelector('h1', { timeout: 5000 }).catch(() => {});
+                
+                const details = await page.evaluate(`(() => {
+                    const name = document.querySelector('h1')?.textContent?.trim() || 'Desconhecido';
+                    
+                    const ratingStr = document.querySelector('div.F7nice > span:first-child')?.textContent || '';
+                    const rating = ratingStr ? parseFloat(ratingStr.replace(',', '.')) : 0;
+                    
+                    const reviewStr = document.querySelector('div.F7nice > span:nth-child(2)')?.textContent || '';
+                    const reviewsMatch = reviewStr.match(/([\\d,.]+)/);
+                    const reviews = reviewsMatch ? parseInt(reviewsMatch[1].replace(/[.,]/g, ''), 10) : 0;
+                    
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    let phone = null;
+                    let address = 'N/A';
+                    
+                    buttons.forEach(btn => {
+                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                        const text = btn.textContent || '';
+                        
+                        if (ariaLabel.includes('Telefone') || ariaLabel.includes('Phone')) {
+                            phone = text.trim();
+                        }
+                        if (ariaLabel.includes('Endereço') || ariaLabel.includes('Address')) {
+                            address = text.trim();
                         }
                     });
 
-                    const details = detailsResponse.data.result || place;
-                    const photoReference = details.photos?.[0]?.photo_reference;
-                    const imageUrl = photoReference
-                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photoReference}&key=${GOOGLE_PLACES_API_KEY}`
-                        : null;
+                    const websiteLink = document.querySelector('a[data-item-id="authority"]');
+                    const website = websiteLink ? websiteLink.href : null;
+                    
+                    return { name, rating, user_ratings_total: reviews, phone, address, website };
+                })()`);
 
-                    // Extrai cidade e estado reais do Google
-                    let cityFromGoogle = '';
-                    let stateFromGoogle = '';
-
-                    if (details.address_components) {
-                        const cityComp = details.address_components.find((c: any) =>
-                            c.types.includes('administrative_area_level_2') || c.types.includes('locality')
-                        );
-                        const stateComp = details.address_components.find((c: any) =>
-                            c.types.includes('administrative_area_level_1')
-                        );
-                        cityFromGoogle = cityComp ? cityComp.long_name : city;
-                        stateFromGoogle = stateComp ? stateComp.short_name : 'N/A';
-                    } else {
-                        cityFromGoogle = city;
-                        stateFromGoogle = 'N/A';
-                    }
-
+                if (details && details.name !== 'Desconhecido') {
+                    // Mapeamento de social links
                     const socialMediaDomains = ['facebook.com', 'instagram.com', 'whatsapp.com', 'wa.me', 'api.whatsapp.com', 'youtube.com', 'linkedin.com', 'linktr.ee'];
                     const website = details.website;
                     const hasOwnWebsite = website && !socialMediaDomains.some(domain => website.toLowerCase().includes(domain));
-
-                    // Mapeamento inteligente de social links
+                    
                     let linkedinUrl = null;
                     let instagramUrl = null;
                     let whatsappUrl = null;
@@ -101,82 +118,73 @@ export const searchLeads = async (query: string, city: string, filters: SearchFi
                     }
 
                     const leadInfo: LeadData = {
-                        name: details.name || place.name,
-                        address: details.formatted_address || place.formatted_address,
-                        website: hasOwnWebsite ? website : undefined, // Só salva no campo website se for site próprio
-                        rating: details.rating || place.rating,
-                        user_ratings_total: details.user_ratings_total || place.user_ratings_total,
-                        phone: details.formatted_phone_number || place.formatted_phone_number,
+                        name: details.name,
+                        address: details.address,
+                        website: hasOwnWebsite ? website : undefined,
+                        rating: details.rating,
+                        user_ratings_total: details.user_ratings_total,
+                        phone: details.phone,
                         segment: query,
-                        image_url: imageUrl
+                        image_url: null
                     };
 
-                    const location = place.geometry?.location;
-
-                    return {
+                    detailedLeads.push({
                         ...leadInfo,
-                        city: cityFromGoogle,
-                        state: stateFromGoogle,
+                        city: city,
+                        state: "N/A",
                         score: calculateScore(leadInfo),
                         status: 'new',
-                        place_id: place.place_id,
+                        place_id: `scrap_${Math.random().toString(36).substr(2, 9)}`,
                         has_own_website: !!hasOwnWebsite,
-                        origin: 'google_places',
-                        latitude: location?.lat,
-                        longitude: location?.lng,
+                        origin: 'google_places_scraper',
                         linkedin_url: linkedinUrl,
                         instagram_url: instagramUrl,
                         facebook_url: facebookUrl,
                         whatsapp_url: whatsappUrl
-                    };
-                } catch (err) {
-                    console.error(`Error fetching details for ${place.name}:`, err);
-                    return null;
+                    });
                 }
-            })
-        );
+            } catch (innerError) {
+                console.log('[Google Maps Scraper] Erro ao extrair detalhe de um lead', innerError);
+            }
+        }
+        
+        await browser.close();
 
-        // 4. Aplica filtros avançados
-        let filteredLeads = detailedLeads.filter(l => l !== null);
+        // Aplica filtros avançados
+        let filteredLeads = detailedLeads;
 
-        // Filtro de avaliação mínima
         if (filters.minRating && filters.minRating > 0) {
-            filteredLeads = filteredLeads.filter(lead =>
-                lead.rating && lead.rating >= filters.minRating!
-            );
+            filteredLeads = filteredLeads.filter(lead => lead.rating && lead.rating >= filters.minRating!);
         }
 
-        // Filtro de número mínimo de avaliações
         if (filters.minReviews && filters.minReviews > 0) {
-            filteredLeads = filteredLeads.filter(lead =>
-                lead.user_ratings_total && lead.user_ratings_total >= filters.minReviews!
-            );
+            filteredLeads = filteredLeads.filter(lead => lead.user_ratings_total && lead.user_ratings_total >= filters.minReviews!);
         }
 
-        // Filtro de empresas sem site
         if (filters.onlyWithoutWebsite) {
             filteredLeads = filteredLeads.filter(lead => !lead.has_own_website);
         }
 
-        // Filtro de telefone obrigatório
         if (filters.onlyWithPhone) {
             filteredLeads = filteredLeads.filter(lead => lead.phone);
         }
 
-        console.log(`Filtros aplicados: ${filteredLeads.length} leads de ${detailedLeads.length} originais`);
-
+        console.log(`[Google Maps Scraper] Finalizado! ${filteredLeads.length} leads aprovados.`);
         return filteredLeads;
 
     } catch (error) {
-        console.error('Error searching leads:', error);
-        throw error;
+        console.error('[Google Maps Scraper] Erro Crítico:', error);
+        if (browser) await browser.close();
+        
+        console.warn('[Google Maps Scraper] Retornando Mock Data como fallback');
+        return getMockLeads(query, city);
     }
 };
 
 const getMockLeads = (query: string, city: string) => {
     return [
         {
-            name: `${query} Exemplo 1`,
+            name: `${query} Mocked VER 2`,
             segment: query,
             city: city,
             state: "SP",
@@ -185,17 +193,6 @@ const getMockLeads = (query: string, city: string) => {
             score: 85,
             status: "new",
             place_id: "mock_1"
-        },
-        {
-            name: `${query} Exemplo 2`,
-            segment: query,
-            city: city,
-            state: "SP",
-            phone: "(11) 88888-8888",
-            website: "http://exemplo.com",
-            score: 45,
-            status: "new",
-            place_id: "mock_2"
         }
     ];
 };

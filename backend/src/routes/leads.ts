@@ -4,6 +4,7 @@ import axios from 'axios';
 import { searchLeads } from '../services/googlePlaces.js';
 import { searchLinkedinCompanies } from '../services/linkedinSearch.js';
 import { generateSalesCopy } from '../services/aiService.js';
+import { searchOsint, normalizeOsintToLead } from '../services/osintService.js';
 
 
 const router = Router();
@@ -172,6 +173,61 @@ router.post('/collect-linkedin', async (req, res) => {
         });
 
     } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/leads/collect-osint - Coleta dados via Mr. Holmes OSINT
+router.post('/collect-osint', async (req, res) => {
+    const { target, searchType, platforms, segment } = req.body;
+
+    if (!target || !searchType) {
+        return res.status(400).json({ error: 'target e searchType são obrigatórios' });
+    }
+
+    if (!['username', 'domain', 'phone'].includes(searchType)) {
+        return res.status(400).json({ error: 'searchType deve ser: username, domain ou phone' });
+    }
+
+    try {
+        console.log(`[OSINT] Iniciando busca: ${searchType} → "${target}"`);
+        const osintResult = await searchOsint(target, searchType, platforms || undefined);
+        console.log(`[OSINT] Encontrado: ${osintResult.count} resultado(s) em ${osintResult.total_checked} plataformas`);
+
+        // Normaliza o resultado para o schema de leads
+        const lead = normalizeOsintToLead(osintResult, segment);
+        if (!lead) {
+            return res.status(500).json({ error: 'Falha ao normalizar resultado OSINT' });
+        }
+
+        // Salva no Supabase
+        const { data: savedData, error: insertError } = await supabase
+            .from('leads')
+            .insert([lead])
+            .select();
+
+        if (insertError) {
+            console.error('[OSINT] Erro ao salvar no Supabase:', insertError.message);
+            // Retorna os dados mesmo sem salvar no banco
+            return res.json({
+                message: 'OSINT concluído (sem persistência no banco)',
+                count: osintResult.count,
+                total_checked: osintResult.total_checked,
+                data: [lead],
+                osint_raw: osintResult.results,
+            });
+        }
+
+        res.json({
+            message: 'Busca OSINT concluída e salva com sucesso',
+            count: osintResult.count,
+            total_checked: osintResult.total_checked,
+            data: savedData || [lead],
+            osint_raw: osintResult.results,
+        });
+
+    } catch (error: any) {
+        console.error('[OSINT] Erro:', error.message);
         res.status(500).json({ error: error.message });
     }
 });

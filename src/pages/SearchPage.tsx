@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, MapPin, Building2, Loader2, CheckCircle2, ChevronDown, ChevronUp, Star, Globe, Phone, Filter, Linkedin } from "lucide-react";
+import { Search, MapPin, Building2, Loader2, CheckCircle2, ChevronDown, ChevronUp, Star, Globe, Phone, Filter, Linkedin, Fingerprint, User, Hash } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,11 @@ export default function SearchPage() {
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [searchType, setSearchType] = useState<"maps" | "linkedin">("maps");
+  const [searchType, setSearchType] = useState<"maps" | "linkedin" | "osint">("maps");
+
+  // OSINT States
+  const [osintTarget, setOsintTarget] = useState("");
+  const [osintType, setOsintType] = useState<"username" | "domain" | "phone">("username");
 
   // Filtros Avançados
   const [radius, setRadius] = useState([15]); // km
@@ -28,16 +32,25 @@ export default function SearchPage() {
   const [onlyWithPhone, setOnlyWithPhone] = useState(false);
 
   const handleSearch = async () => {
-    if (!niche || !city) return;
+    if (searchType !== "osint" && (!niche || !city)) return;
+    if (searchType === "osint" && !osintTarget) return;
     setSearching(true);
     setShowAdvanced(false); // Oculta filtros avançados ao buscar
 
     try {
-      const endpoint = searchType === "maps" ? "collect" : "collect-linkedin";
-      const response = await fetch(`${API_URL}/api/leads/${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let endpoint = "";
+      let bodyData = {};
+
+      if (searchType === "osint") {
+        endpoint = "collect-osint";
+        bodyData = {
+          target: osintTarget,
+          searchType: osintType,
+          segment: `OSINT - ${osintType}`
+        };
+      } else {
+        endpoint = searchType === "maps" ? "collect" : "collect-linkedin";
+        bodyData = {
           query: niche,
           city: city,
           ...(searchType === "maps" && {
@@ -47,7 +60,13 @@ export default function SearchPage() {
             onlyWithoutWebsite: onlyWithoutWebsite,
             onlyWithPhone: onlyWithPhone
           })
-        }),
+        };
+      }
+
+      const response = await fetch(`${API_URL}/api/leads/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyData),
       });
 
       if (!response.ok) throw new Error("Erro na coleta de leads");
@@ -55,9 +74,9 @@ export default function SearchPage() {
       const data = await response.json();
       setResults(data.data || []);
 
-      const sourceName = searchType === "maps" ? "Google Maps" : "LinkedIn";
-      toast.success(`${data.count || 0} leads de ${sourceName} coletados!`, {
-        description: `Os leads foram salvos e qualificados com sucesso.`,
+      const sourceName = searchType === "maps" ? "Google Maps" : searchType === "linkedin" ? "LinkedIn" : "OSINT";
+      toast.success(`${data.count || 0} leads de ${sourceName} processados!`, {
+        description: `Os resultados foram salvos com sucesso.`,
         action: {
           label: "Ver Leads",
           onClick: () => navigate("/leads"),
@@ -83,7 +102,7 @@ export default function SearchPage() {
 
   return (
     <>
-      <PageHeader title="Buscar Empresas" description="Encontre e qualifique leads corporativos usando Google Maps ou LinkedIn" />
+      <PageHeader title="Buscar Empresas" description="Encontre e qualifique leads corporativos usando Google Maps, LinkedIn ou OSINT (Mr. Holmes)" />
 
       {/* Seletor de Origem */}
       <div className="flex p-1 bg-muted/30 rounded-xl w-fit mb-6 border border-border/50">
@@ -105,43 +124,101 @@ export default function SearchPage() {
           <Linkedin className="h-4 w-4 mr-2" />
           LinkedIn
         </Button>
+        <Button 
+          variant={searchType === "osint" ? "default" : "ghost"} 
+          size="sm"
+          onClick={() => { setSearchType("osint"); setResults(null); }}
+          className={`rounded-lg px-6 transition-all ${searchType === "osint" ? "shadow-md bg-slate-800 text-white hover:bg-slate-700" : ""}`}
+        >
+          <Fingerprint className="h-4 w-4 mr-2" />
+          OSINT (Mr. Holmes)
+        </Button>
       </div>
 
       <div className="glass-card rounded-xl p-6 mb-8 max-w-4xl">
         {/* Filtros Básicos */}
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="h-3.5 w-3.5 text-primary" />
-                Nicho / Segmento
-              </Label>
-              <div className="relative group">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input
-                  placeholder={searchType === "maps" ? "Ex: Oficina Mecânica, Restaurante..." : "Ex: Software, Advocacia, Marketing..."}
-                  className="pl-10 h-12 md:h-11 transition-all"
-                  value={niche}
-                  onChange={(e) => setNiche(e.target.value)}
-                />
+          {searchType !== "osint" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                  Nicho / Segmento
+                </Label>
+                <div className="relative group">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                  <Input
+                    placeholder={searchType === "maps" ? "Ex: Oficina Mecânica, Restaurante..." : "Ex: Software, Advocacia, Marketing..."}
+                    className="pl-10 h-12 md:h-11 transition-all"
+                    value={niche}
+                    onChange={(e) => setNiche(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  Cidade / Região
+                </Label>
+                <div className="relative group">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                  <Input
+                    placeholder="Ex: São Paulo, SP"
+                    className="pl-10 h-12 md:h-11 transition-all"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-primary" />
-                Cidade / Região
-              </Label>
-              <div className="relative group">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input
-                  placeholder="Ex: São Paulo, SP"
-                  className="pl-10 h-12 md:h-11 transition-all"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Fingerprint className="h-3.5 w-3.5 text-slate-500" />
+                  Alvo (Username, Domínio ou Telefone)
+                </Label>
+                <div className="relative group">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-slate-500 transition-colors" />
+                  <Input
+                    placeholder={osintType === "username" ? "Ex: lucksi" : osintType === "domain" ? "Ex: google.com" : "Ex: +5511999999999"}
+                    className="pl-10 h-12 md:h-11 transition-all"
+                    value={osintTarget}
+                    onChange={(e) => setOsintTarget(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Filter className="h-3.5 w-3.5 text-slate-500" />
+                  Tipo de Busca OSINT
+                </Label>
+                <div className="flex gap-2 h-12 md:h-11">
+                  <Button 
+                    variant={osintType === "username" ? "default" : "outline"}
+                    onClick={() => setOsintType("username")}
+                    className="flex-1"
+                  >
+                    <User className="h-4 w-4 mr-2" /> User
+                  </Button>
+                  <Button 
+                    variant={osintType === "domain" ? "default" : "outline"}
+                    onClick={() => setOsintType("domain")}
+                    className="flex-1"
+                  >
+                    <Globe className="h-4 w-4 mr-2" /> Web
+                  </Button>
+                  <Button 
+                    variant={osintType === "phone" ? "default" : "outline"}
+                    onClick={() => setOsintType("phone")}
+                    className="flex-1"
+                  >
+                    <Hash className="h-4 w-4 mr-2" /> Phone
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Toggle Filtros Avançados (Apenas Maps por enquanto) */}
           {searchType === "maps" && (
@@ -364,19 +441,19 @@ export default function SearchPage() {
           {/* Botão de Busca */}
           <Button
             onClick={handleSearch}
-            disabled={!niche || !city || searching}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 h-12 text-base"
+            disabled={searchType === "osint" ? !osintTarget || searching : (!niche || !city || searching)}
+            className={`w-full font-bold shadow-lg h-12 text-base ${searchType === "osint" ? "bg-slate-800 hover:bg-slate-700 text-white shadow-slate-800/20" : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"}`}
             size="lg"
           >
             {searching ? (
               <>
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                {searchType === "maps" ? "Coletando do Maps..." : "Mapeando LinkedIn..."}
+                {searchType === "maps" ? "Coletando do Maps..." : searchType === "linkedin" ? "Mapeando LinkedIn..." : "Executando varredura OSINT..."}
               </>
             ) : (
               <>
                 <Search className="h-5 w-5 mr-2" />
-                {searchType === "maps" ? "Buscar e Salvar Leads" : "Localizar Empresas no LinkedIn"}
+                {searchType === "maps" ? "Buscar e Salvar Leads" : searchType === "linkedin" ? "Localizar Empresas no LinkedIn" : "Iniciar Investigação OSINT"}
               </>
             )}
           </Button>
@@ -387,7 +464,9 @@ export default function SearchPage() {
         <div className="space-y-3 animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <p className="text-sm text-muted-foreground">
-              {results.length} empresas processadas para <span className="font-bold text-foreground">"{niche}"</span> em <span className="font-bold text-foreground">"{city}"</span>
+              {searchType === "osint" 
+                ? <>{results.length} resultados processados para <span className="font-bold text-foreground">"{osintTarget}"</span> ({osintType})</>
+                : <>{results.length} empresas processadas para <span className="font-bold text-foreground">"{niche}"</span> em <span className="font-bold text-foreground">"{city}"</span></>}
             </p>
             <Button variant="outline" size="sm" onClick={() => navigate("/leads")} className="w-full sm:w-auto">
               Ver todos na lista de Leads
@@ -396,20 +475,20 @@ export default function SearchPage() {
           {results.slice(0, 10).map((r, i) => (
             <div key={i} className="glass-card rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-lg transition-shadow border border-border/50">
               <div className="flex items-start gap-4">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${r.origin === 'linkedin' ? 'bg-blue-600/10 text-blue-600' : 'bg-success/10 text-success'}`}>
-                  {r.origin === 'linkedin' ? <Linkedin className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${r.origin === 'linkedin' ? 'bg-blue-600/10 text-blue-600' : r.origin === 'mr_holmes' ? 'bg-slate-800/10 text-slate-800' : 'bg-success/10 text-success'}`}>
+                  {r.origin === 'linkedin' ? <Linkedin className="h-5 w-5" /> : r.origin === 'mr_holmes' ? <Fingerprint className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
                 </div>
                 <div>
                   <p className="font-bold text-foreground leading-tight">{r.name}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                    <span>Score: <span className="text-primary font-bold">{r.score}</span></span>
+                    <span>Score: <span className={r.origin === 'mr_holmes' ? 'text-slate-800 font-bold' : 'text-primary font-bold'}>{r.score}</span></span>
                     {r.rating && <span className="flex items-center gap-0.5">⭐ {r.rating}</span>}
                     {r.user_ratings_total && <span>({r.user_ratings_total})</span>}
                   </p>
-                  {(r.phone || r.origin === 'linkedin') && (
+                  {(r.phone || r.origin === 'linkedin' || r.origin === 'mr_holmes') && (
                     <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-mono">
-                      {r.origin === 'linkedin' ? <Linkedin className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
-                      {r.origin === 'linkedin' ? "Perfil Comercial" : r.phone}
+                      {r.origin === 'linkedin' ? <Linkedin className="h-3 w-3" /> : r.origin === 'mr_holmes' ? <Globe className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
+                      {r.origin === 'linkedin' ? "Perfil Comercial" : r.origin === 'mr_holmes' ? r.website || r.phone || "Investigação Digital" : r.phone}
                     </p>
                   )}
                 </div>
@@ -417,6 +496,8 @@ export default function SearchPage() {
               <div className="flex items-center gap-3 sm:justify-end ml-14 sm:ml-0">
                 {r.origin === 'linkedin' ? (
                   <Badge className="bg-blue-600/10 text-blue-600 text-[10px] font-bold py-0.5 border-blue-600/20 uppercase tracking-tighter">LinkedIn Company</Badge>
+                ) : r.origin === 'mr_holmes' ? (
+                  <Badge className="bg-slate-800/10 text-slate-800 text-[10px] font-bold py-0.5 border-slate-800/20 uppercase tracking-tighter">Inteligência OSINT</Badge>
                 ) : !r.website ? (
                   <Badge variant="destructive" className="bg-destructive/10 text-destructive text-[10px] font-bold py-0.5 border-destructive/20 uppercase tracking-tighter">Oportunidade: Sem site</Badge>
                 ) : (

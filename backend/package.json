@@ -7,7 +7,9 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev:node": "tsx watch src/index.ts",
+    "dev:osint": "cd python-osint && python -m uvicorn main:app --port 8001 --reload",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"Node,OSINT\" -c \"cyan.bold,green.bold\" \"npm run dev:node\" \"npm run dev:osint\"",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -26,6 +28,7 @@
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "pino": "^10.3.1",
+    "puppeteer": "^24.43.0",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
@@ -34,6 +37,7 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^25.2.3",
     "@types/qrcode": "^1.5.6",
+    "concurrently": "^9.2.1",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
